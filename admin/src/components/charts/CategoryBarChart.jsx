@@ -41,15 +41,15 @@ export const CategoryBarChart = ({
 
         return (
           <div key={item[nameKey] || index} className="space-y-1">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-gray-700 truncate max-w-[160px]">
+            <div className="flex items-center justify-between text-xs gap-2">
+              <span className="font-bold text-black truncate flex-1" title={item[nameKey]}>
                 {item[nameKey]}
               </span>
-              <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-gray-900">
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-mono font-bold text-black whitespace-nowrap">
                   {val.toLocaleString()} {unit}
                 </span>
-                <span className="text-[10px] text-gray-400 w-8 text-right font-medium">
+                <span className="text-[10px] text-neutral-700 w-7 text-right font-bold">
                   {pct}%
                 </span>
               </div>

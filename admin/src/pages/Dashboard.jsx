@@ -11,28 +11,38 @@ import {
   ShieldAlert,
   Activity,
   Eye,
+  Tag,
+  DollarSign,
+  PackageCheck,
+  Plus,
+  RefreshCw,
+  FileText,
 } from 'lucide-react';
-import { Card, CardHeader } from '../components/common/Card';
-import { Button } from '../components/common/Button';
-import { Badge } from '../components/common/Badge';
 import { InvoiceModal } from '../components/common/InvoiceModal';
+import { AreaTrendChart } from '../components/charts/AreaTrendChart';
 import { TrendChart } from '../components/charts/TrendChart';
 import { CategoryBarChart } from '../components/charts/CategoryBarChart';
+import { BatchForm } from '../components/batches/BatchForm';
+import { MedicineDetails } from '../components/medicines/MedicineDetails';
 import { useInventory } from '../hooks/useInventory';
 import { useSales } from '../hooks/useSales';
 import { useSettings } from '../hooks/useSettings';
+import { useToast } from '../hooks/useToast';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { BATCH_STOCK_STATUS } from '../utils/constants';
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { medicines, batches, stockHistory } = useInventory();
+  const toast = useToast();
+  const { medicines, batches, stockHistory, addBatch, updateBatch, adjustBatchStock, deleteBatch } = useInventory();
   const { sales } = useSales();
   const { settings } = useSettings();
 
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [viewingMedicine, setViewingMedicine] = useState(null);
+  const [restockMedicine, setRestockMedicine] = useState(null);
 
-  // 1. DYNAMIC SUMMARY CALCULATIONS (From actual shared application data)
+  // 1. DYNAMIC SUMMARY CALCULATIONS
   const stats = useMemo(() => {
     const now = new Date();
     const todayStr = now.toDateString();
@@ -60,11 +70,11 @@ export const Dashboard = () => {
     const totalStockUnits = batches.reduce((sum, b) => sum + (Number(b.quantity) || 0), 0);
 
     const lowStockCount = batches.filter(
-      (b) => b.status === BATCH_STOCK_STATUS.LOW_STOCK
+      (b) => b.status === BATCH_STOCK_STATUS.LOW_STOCK || Number(b.quantity) <= (settings.lowStockThreshold || 15)
     ).length;
 
     const expiredCount = batches.filter(
-      (b) => b.status === BATCH_STOCK_STATUS.EXPIRED
+      (b) => b.status === BATCH_STOCK_STATUS.EXPIRED || (b.isExpired && Number(b.quantity) > 0)
     ).length;
 
     return {
@@ -76,7 +86,7 @@ export const Dashboard = () => {
       lowStockCount,
       expiredCount,
     };
-  }, [medicines, batches, sales]);
+  }, [medicines, batches, sales, settings]);
 
   // 2. 14-DAY SALES CHART DATA
   const sales14DaysData = useMemo(() => {
@@ -89,7 +99,6 @@ export const Dashboard = () => {
       const dateStr = d.toISOString().slice(0, 10);
       const label = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-      // Calculate total sales for this exact date
       const dayTotal = sales
         .filter((s) => s.date?.slice(0, 10) === dateStr)
         .reduce((sum, s) => sum + (Number(s.grandTotal) || 0), 0);
@@ -114,7 +123,6 @@ export const Dashboard = () => {
       const dateStr = d.toISOString().slice(0, 10);
       const label = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-      // Calculate units added on this date from stock history
       const dayUnits = stockHistory
         .filter((h) => {
           const entryDate = (h.timestamp || h.createdAt || '').slice(0, 10);
@@ -155,7 +163,7 @@ export const Dashboard = () => {
     return batches
       .filter((b) => b.status === BATCH_STOCK_STATUS.LOW_STOCK || b.quantity <= (settings.lowStockThreshold || 15))
       .filter((b) => b.quantity > 0)
-      .slice(0, 6);
+      .slice(0, 5);
   }, [batches, settings]);
 
   // 6. TABLE: Expiring Soon Medicines
@@ -163,7 +171,7 @@ export const Dashboard = () => {
     return batches
       .filter((b) => b.isNearExpiry && b.quantity > 0)
       .sort((a, b) => a.daysLeft - b.daysLeft)
-      .slice(0, 6);
+      .slice(0, 5);
   }, [batches]);
 
   // 7. TABLE: Recent Sales
@@ -177,7 +185,7 @@ export const Dashboard = () => {
   const recentActivitiesList = useMemo(() => {
     return [...stockHistory]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, 6);
+      .slice(0, 5);
   }, [stockHistory]);
 
   // 9. TABLE: Reorder Alerts
@@ -187,30 +195,50 @@ export const Dashboard = () => {
       .slice(0, 5);
   }, [medicines, settings]);
 
-  // Dashboard 6 KPI Cards
+  // Quick batch save handler
+  const handleSaveBatch = (batchData, reason) => {
+    try {
+      addBatch(batchData, reason);
+      toast.showSuccess(`Batch ${batchData.batchNumber} added successfully!`);
+      setRestockMedicine(null);
+    } catch (err) {
+      toast.showError(err.message);
+    }
+  };
+
+  // The 6 Small, Sleek, Colorful, and Responsive KPI Cards
   const kpiCards = [
     {
       title: 'Total Medicines',
       value: stats.totalMedicines.toLocaleString(),
-      subtitle: `${stats.totalStockUnits.toLocaleString()} active units in store`,
+      subtitle: `${stats.totalStockUnits.toLocaleString()} units in catalog`,
       icon: Pill,
-      iconBg: 'bg-emerald-50 text-[#1C9A58]',
+      cardTheme: 'border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/30 hover:border-emerald-400',
+      iconBox: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+      titleColor: 'text-emerald-950',
+      valueColor: 'text-black',
       onClick: () => navigate('/medicines'),
     },
     {
       title: 'Total Stock Units',
       value: stats.totalStockUnits.toLocaleString(),
-      subtitle: `${batches.length} registered batches`,
+      subtitle: `${batches.length} physical batches`,
       icon: Boxes,
-      iconBg: 'bg-teal-50 text-teal-700',
+      cardTheme: 'border-blue-200/90 bg-gradient-to-br from-blue-50/70 via-white to-cyan-50/30 hover:border-blue-400',
+      iconBox: 'bg-blue-100 text-blue-800 border-blue-300',
+      titleColor: 'text-blue-950',
+      valueColor: 'text-black',
       onClick: () => navigate('/inventory'),
     },
     {
       title: "Today's Sales",
       value: formatCurrency(stats.todayRevenue),
-      subtitle: `${stats.todayCount} customer transactions today`,
+      subtitle: `${stats.todayCount} counter receipts today`,
       icon: ShoppingCart,
-      iconBg: 'bg-blue-50 text-blue-600',
+      cardTheme: 'border-indigo-200/90 bg-gradient-to-br from-indigo-50/70 via-white to-purple-50/30 hover:border-indigo-400',
+      iconBox: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+      titleColor: 'text-indigo-950',
+      valueColor: 'text-indigo-950',
       onClick: () => navigate('/sales'),
     },
     {
@@ -218,381 +246,550 @@ export const Dashboard = () => {
       value: formatCurrency(stats.monthlyRevenue),
       subtitle: `Recorded in ${new Date().toLocaleDateString([], { month: 'long', year: 'numeric' })}`,
       icon: TrendingUp,
-      iconBg: 'bg-emerald-50 text-[#0F3A2C]',
+      cardTheme: 'border-teal-200/90 bg-gradient-to-br from-teal-50/70 via-white to-emerald-50/30 hover:border-teal-400',
+      iconBox: 'bg-teal-100 text-teal-800 border-teal-300',
+      titleColor: 'text-teal-950',
+      valueColor: 'text-[#1C9A58]',
       onClick: () => navigate('/reports'),
     },
     {
       title: 'Low Stock Batches',
       value: stats.lowStockCount,
-      subtitle: `At or below ${settings.lowStockThreshold || 15} units threshold`,
+      subtitle: stats.lowStockCount > 0 ? `At/below ${settings.lowStockThreshold || 15} units limit` : 'All batches sufficient',
       icon: AlertTriangle,
-      iconBg: 'bg-amber-50 text-amber-600',
+      cardTheme: 'border-amber-200/90 bg-gradient-to-br from-amber-50/70 via-white to-orange-50/30 hover:border-amber-400',
+      iconBox: 'bg-amber-100 text-amber-800 border-amber-300',
+      titleColor: 'text-amber-950',
+      valueColor: 'text-amber-950',
       onClick: () => navigate('/inventory'),
     },
     {
       title: 'Expired Medicines',
       value: stats.expiredCount,
-      subtitle: stats.expiredCount > 0 ? 'Requires quarantine / disposal' : 'No expired stock',
+      subtitle: stats.expiredCount > 0 ? 'Requires quarantine disposal' : 'Zero expired medicines',
       icon: ShieldAlert,
-      iconBg: 'bg-red-50 text-red-600',
+      cardTheme: 'border-rose-200/90 bg-gradient-to-br from-rose-50/70 via-white to-red-50/30 hover:border-rose-400',
+      iconBox: 'bg-rose-100 text-rose-800 border-rose-300',
+      titleColor: 'text-rose-950',
+      valueColor: 'text-rose-950',
       onClick: () => navigate('/inventory'),
     },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner & Quick Links */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-            <Activity className="w-7 h-7 text-[#1C9A58]" />
-            Pharmacy Operations Dashboard
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Real-time multi-batch inventory intelligence, counter sales analytics, and audit trends.
-          </p>
+    <div className="space-y-4 sm:space-y-5 select-none font-sans">
+      {/* ========================================================
+          TOP BANNER & QUICK ACTIONS
+          ======================================================== */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-[#1C9A58] to-teal-400 text-white shadow-xs flex items-center justify-center shrink-0">
+            <Activity className="w-5 h-5 drop-shadow-xs" />
+          </div>
+          <div>
+            <h1 className="text-base sm:text-lg font-bold text-black tracking-tight leading-tight">
+              Pharmacy Operations Dashboard
+            </h1>
+            <p className="text-xs text-neutral-700 font-medium mt-0.5">
+              Live multi-batch inventory intelligence, counter revenue analytics, and stock health.
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            iconLeft={Boxes}
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
             onClick={() => navigate('/inventory')}
+            className="text-xs font-bold px-3.5 py-2 rounded-lg border border-slate-300 text-black hover:bg-slate-100 cursor-pointer transition-all flex items-center gap-1.5 shadow-2xs"
           >
-            Inventory Control
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            iconLeft={ShoppingCart}
+            <Boxes className="w-4 h-4 text-emerald-700" />
+            <span>Inventory Control</span>
+          </button>
+          <button
+            type="button"
             onClick={() => navigate('/pos')}
+            className="bg-gradient-to-r from-emerald-600 via-[#1C9A58] to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-xs hover:shadow-sm cursor-pointer transition-all flex items-center gap-1.5"
           >
-            Open POS Counter
-          </Button>
+            <ShoppingCart className="w-4 h-4" />
+            <span>Open POS Counter</span>
+          </button>
         </div>
       </div>
 
-      {/* 6 Core KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      {/* ========================================================
+          6 COMPACT, COLORFUL, SMALL & RESPONSIVE KPI CARDS
+          ======================================================== */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3">
         {kpiCards.map((card, idx) => {
           const Icon = card.icon;
           return (
-            <Card
+            <div
               key={idx}
-              hoverEffect
               onClick={card.onClick}
-              className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
+              className={`p-3 rounded-xl border shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer flex flex-col justify-between gap-1.5 ${card.cardTheme}`}
+              title={`Click to view ${card.title}`}
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
-                    {card.title}
-                  </p>
-                  <p className="text-xl font-black text-gray-900 mt-1">
-                    {card.value}
-                  </p>
-                  <p className="text-[10px] text-gray-400 mt-1 leading-tight">
-                    {card.subtitle}
-                  </p>
-                </div>
-                <div className={`p-2.5 rounded-xl shrink-0 ${card.iconBg}`}>
-                  <Icon className="w-5 h-5" />
+              <div className="flex items-center justify-between gap-1">
+                <span className={`text-[11px] font-bold uppercase tracking-wider truncate ${card.titleColor}`}>
+                  {card.title}
+                </span>
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg border flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105 ${card.iconBox}`}>
+                  <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
                 </div>
               </div>
-            </Card>
+
+              <div>
+                <p className={`text-base sm:text-lg lg:text-xl font-extrabold tabular-nums tracking-tight ${card.valueColor}`}>
+                  {card.value}
+                </p>
+                <p className="text-[10px] sm:text-[11px] text-neutral-600 font-medium truncate mt-0.5">
+                  {card.subtitle}
+                </p>
+              </div>
+            </div>
           );
         })}
       </div>
 
-      {/* 3 Dashboard Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* 14-Day Sales Chart */}
-        <div className="lg:col-span-4">
-          <Card>
-            <CardHeader
-              title="14-Day Revenue Trend"
-              subtitle="Daily counter sales revenue over past two weeks"
-            />
-            <div className="mt-4">
-              <TrendChart
-                data={sales14DaysData}
-                dataKey="value"
-                labelKey="label"
-                color="#1C9A58"
-                secondaryColor="#0F3A2C"
-                isCurrency={true}
-                height={190}
-              />
+      {/* ========================================================
+          3 DISTINCT CHARTS: 1 AREA GRAPH, 1 BAR CHART, 1 PROGRESS
+          ======================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
+        {/* CHART 1: 14-Day Revenue Trend (SMOOTH AREA/LINE GRAPH) */}
+        <div className="lg:col-span-4 p-3.5 sm:p-4 rounded-xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/30 via-white to-white shadow-2xs space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-emerald-100">
+            <div className="flex items-center gap-2">
+              <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-1 rounded-md shadow-2xs">
+                <TrendingUp className="w-3.5 h-3.5" />
+              </span>
+              <div>
+                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+                  Revenue Curve (14 Days)
+                </h3>
+                <p className="text-[11px] text-neutral-600 font-medium">Daily counter revenue trend graph</p>
+              </div>
             </div>
-          </Card>
+            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+              Graph
+            </span>
+          </div>
+          <div className="pt-1">
+            <AreaTrendChart
+              data={sales14DaysData}
+              dataKey="value"
+              labelKey="label"
+              color="#1C9A58"
+              isCurrency={true}
+              height={180}
+            />
+          </div>
         </div>
 
-        {/* 14-Day Purchases / Inflow Chart */}
-        <div className="lg:col-span-4">
-          <Card>
-            <CardHeader
-              title="14-Day Stock Purchases"
-              subtitle="Stock units received into batches"
-            />
-            <div className="mt-4">
-              <TrendChart
-                data={purchases14DaysData}
-                dataKey="value"
-                labelKey="label"
-                color="#2563EB"
-                secondaryColor="#1E3A8A"
-                isCurrency={false}
-                height={190}
-                emptyMessage="No stock received in past 14 days"
-              />
+        {/* CHART 2: 14-Day Purchases (VERTICAL COLUMN/BAR CHART) */}
+        <div className="lg:col-span-4 p-3.5 sm:p-4 rounded-xl border border-blue-200/90 bg-gradient-to-br from-blue-50/30 via-white to-white shadow-2xs space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-blue-100">
+            <div className="flex items-center gap-2">
+              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1 rounded-md shadow-2xs">
+                <Boxes className="w-3.5 h-3.5" />
+              </span>
+              <div>
+                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+                  Stock Purchases (14 Days)
+                </h3>
+                <p className="text-[11px] text-neutral-600 font-medium">Inbound shipment units received</p>
+              </div>
             </div>
-          </Card>
+            <span className="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full border border-blue-300">
+              Bar Chart
+            </span>
+          </div>
+          <div className="pt-1">
+            <TrendChart
+              data={purchases14DaysData}
+              dataKey="value"
+              labelKey="label"
+              color="#2563EB"
+              secondaryColor="#1D4ED8"
+              isCurrency={false}
+              height={180}
+              emptyMessage="No inbound stock recorded in past 14 days"
+            />
+          </div>
         </div>
 
-        {/* Stock by Category Breakdown */}
-        <div className="lg:col-span-4">
-          <Card>
-            <CardHeader
-              title="Stock by Category"
-              subtitle="Distribution of stock units across categories"
-            />
-            <div className="mt-4">
-              <CategoryBarChart data={categoryStockData} maxItems={6} />
+        {/* CHART 3: Stock by Category (HORIZONTAL DISTRIBUTION PROGRESS) */}
+        <div className="lg:col-span-4 p-3.5 sm:p-4 rounded-xl border border-purple-200/90 bg-gradient-to-br from-purple-50/30 via-white to-white shadow-2xs space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-purple-100">
+            <div className="flex items-center gap-2">
+              <span className="bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white p-1 rounded-md shadow-2xs">
+                <Tag className="w-3.5 h-3.5" />
+              </span>
+              <div>
+                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+                  Stock by Category
+                </h3>
+                <p className="text-[11px] text-neutral-600 font-medium">Therapeutic class inventory share</p>
+              </div>
             </div>
-          </Card>
+            <span className="text-[10px] font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-full border border-purple-300">
+              Distribution
+            </span>
+          </div>
+          <div className="pt-1">
+            <CategoryBarChart data={categoryStockData} maxItems={6} />
+          </div>
         </div>
       </div>
 
-      {/* 5 Operational Tables Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Low Stock Medicines Table */}
-        <div className="lg:col-span-6">
-          <Card>
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+      {/* ========================================================
+          OPERATIONAL ALERTS: LOW STOCK & EXPIRING BATCHES
+          ======================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
+        {/* Low Stock Alert Table */}
+        <div className="lg:col-span-6 p-3.5 sm:p-4 rounded-xl border border-amber-200/90 bg-gradient-to-br from-amber-50/40 via-white to-white shadow-2xs space-y-2.5">
+          <div className="flex items-center justify-between pb-2 border-b border-amber-200/80">
+            <div className="flex items-center gap-2">
+              <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-1 rounded-md shadow-2xs">
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </span>
               <div>
-                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                  <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  Low Stock Medicines
+                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+                  Low Stock Medicines Alert
                 </h3>
-                <p className="text-xs text-gray-500">Batches needing restocking</p>
+                <p className="text-[11px] text-neutral-600 font-medium">Batches requiring restock shipments</p>
               </div>
-              <button
-                type="button"
-                onClick={() => navigate('/inventory')}
-                className="text-xs font-semibold text-[#1C9A58] hover:underline flex items-center gap-1"
-              >
-                View All <ArrowRight className="w-3 h-3" />
-              </button>
             </div>
+            <button
+              type="button"
+              onClick={() => navigate('/inventory')}
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span>View All</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-            <div className="divide-y divide-gray-100 mt-2 text-xs">
-              {lowStockBatches.length === 0 ? (
-                <div className="py-6 text-center text-gray-400">
-                  All active batches are above minimum stock threshold.
-                </div>
-              ) : (
-                lowStockBatches.map((b) => (
-                  <div key={b.batchId || b.id} className="py-2.5 flex items-center justify-between gap-2">
-                    <div>
-                      <p className="font-bold text-gray-900">{b.medicineName}</p>
-                      <p className="text-[11px] text-gray-500">
-                        Batch: <span className="font-mono">{b.batchNumber}</span> &bull; {b.location}
+          <div className="divide-y divide-slate-100 text-xs">
+            {lowStockBatches.length === 0 ? (
+              <div className="py-6 text-center text-neutral-500 font-medium">
+                All active batches are above minimum stock threshold.
+              </div>
+            ) : (
+              lowStockBatches.map((b) => {
+                const targetMed = medicines.find((m) => m.medicineId === b.medicineId);
+                return (
+                  <div
+                    key={b.batchId || b.id}
+                    className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/80 rounded-lg px-2 cursor-pointer transition-colors group"
+                    onClick={() => {
+                      if (targetMed) setViewingMedicine(targetMed);
+                      else navigate('/inventory');
+                    }}
+                    title="Click to view medicine specs"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-bold text-black text-xs group-hover:text-emerald-800 transition-colors truncate">
+                        {b.medicineName}
                       </p>
+                      <div className="flex items-center gap-2 text-[11px] text-neutral-600 font-medium mt-0.5">
+                        <span className="font-mono font-bold text-black bg-slate-100 px-1.5 py-0.2 rounded border border-slate-300">
+                          {b.batchNumber}
+                        </span>
+                        <span>•</span>
+                        <span>{b.location || 'Shelf'}</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <Badge variant="warning" size="sm" className="font-bold">
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
                         {b.quantity} left
-                      </Badge>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (targetMed) setRestockMedicine(targetMed);
+                          else navigate('/inventory');
+                        }}
+                        className="text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-300 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
+                        title="Add Incoming Batch"
+                      >
+                        + Restock
+                      </button>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </Card>
+                );
+              })
+            )}
+          </div>
         </div>
 
-        {/* Expiring Soon Medicines Table */}
-        <div className="lg:col-span-6">
-          <Card>
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+        {/* Expiring Soon Alert Table */}
+        <div className="lg:col-span-6 p-3.5 sm:p-4 rounded-xl border border-rose-200/90 bg-gradient-to-br from-rose-50/40 via-white to-white shadow-2xs space-y-2.5">
+          <div className="flex items-center justify-between pb-2 border-b border-rose-200/80">
+            <div className="flex items-center gap-2">
+              <span className="bg-gradient-to-r from-rose-500 to-red-500 text-white p-1 rounded-md shadow-2xs">
+                <Clock className="w-3.5 h-3.5" />
+              </span>
               <div>
-                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-rose-500" />
+                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
                   Expiring Soon Batches
                 </h3>
-                <p className="text-xs text-gray-500">Expiring within warning period</p>
+                <p className="text-[11px] text-neutral-600 font-medium">Batches nearing shelf life expiry limit</p>
               </div>
-              <button
-                type="button"
-                onClick={() => navigate('/inventory')}
-                className="text-xs font-semibold text-[#1C9A58] hover:underline flex items-center gap-1"
-              >
-                View All <ArrowRight className="w-3 h-3" />
-              </button>
             </div>
+            <button
+              type="button"
+              onClick={() => navigate('/inventory')}
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span>View All</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-            <div className="divide-y divide-gray-100 mt-2 text-xs">
-              {expiringSoonBatches.length === 0 ? (
-                <div className="py-6 text-center text-gray-400">
-                  No near-expiry medicines requiring immediate attention.
-                </div>
-              ) : (
-                expiringSoonBatches.map((b) => (
-                  <div key={b.batchId || b.id} className="py-2.5 flex items-center justify-between gap-2">
-                    <div>
-                      <p className="font-bold text-gray-900">{b.medicineName}</p>
-                      <p className="text-[11px] text-gray-500">
-                        Batch: <span className="font-mono">{b.batchNumber}</span> &bull; Exp: {formatDate(b.expiryDate)}
+          <div className="divide-y divide-slate-100 text-xs">
+            {expiringSoonBatches.length === 0 ? (
+              <div className="py-6 text-center text-neutral-500 font-medium">
+                No near-expiry medicines requiring quarantine attention.
+              </div>
+            ) : (
+              expiringSoonBatches.map((b) => {
+                const targetMed = medicines.find((m) => m.medicineId === b.medicineId);
+                return (
+                  <div
+                    key={b.batchId || b.id}
+                    className="py-2.5 flex items-center justify-between gap-3 hover:bg-slate-50/80 rounded-lg px-2 cursor-pointer transition-colors group"
+                    onClick={() => {
+                      if (targetMed) setViewingMedicine(targetMed);
+                      else navigate('/inventory');
+                    }}
+                    title="Click to view medicine specs"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-bold text-black text-xs group-hover:text-rose-800 transition-colors truncate">
+                        {b.medicineName}
                       </p>
+                      <div className="flex items-center gap-2 text-[11px] text-neutral-600 font-medium mt-0.5">
+                        <span className="font-mono font-bold text-black bg-slate-100 px-1.5 py-0.2 rounded border border-slate-300">
+                          {b.batchNumber}
+                        </span>
+                        <span>•</span>
+                        <span>Exp: {formatDate(b.expiryDate)}</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                        {b.daysLeft} days left ({b.quantity} units)
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-900 border border-rose-300 shadow-2xs">
+                        {b.daysLeft}d left ({b.quantity}u)
                       </span>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-          </Card>
+                );
+              })
+            )}
+          </div>
         </div>
+      </div>
 
-        {/* Recent Sales Table */}
-        <div className="lg:col-span-4">
-          <Card>
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+      {/* ========================================================
+          RECENT SALES, STOCK AUDIT FEED & REORDER ALERTS
+          ======================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
+        {/* 1. Recent Invoices */}
+        <div className="lg:col-span-4 p-3.5 sm:p-4 rounded-xl border border-emerald-200/90 bg-white shadow-2xs space-y-2.5">
+          <div className="flex items-center justify-between pb-2 border-b border-emerald-100">
+            <div className="flex items-center gap-2">
+              <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-1 rounded-md shadow-2xs">
+                <ShoppingCart className="w-3.5 h-3.5" />
+              </span>
               <div>
-                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                  <ShoppingCart className="w-4 h-4 text-[#1C9A58]" />
-                  Recent Sales
+                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+                  Recent Invoices
                 </h3>
-                <p className="text-xs text-gray-500">Latest counter invoices</p>
+                <p className="text-[11px] text-neutral-600 font-medium">Latest counter customer bills</p>
               </div>
-              <button
-                type="button"
-                onClick={() => navigate('/sales')}
-                className="text-xs font-semibold text-[#1C9A58] hover:underline flex items-center gap-1"
-              >
-                All Sales <ArrowRight className="w-3 h-3" />
-              </button>
             </div>
+            <button
+              type="button"
+              onClick={() => navigate('/sales')}
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span>All Sales</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
 
-            <div className="divide-y divide-gray-100 mt-2 text-xs">
-              {recentSalesList.map((s) => (
-                <div key={s.id || s.invoiceNumber} className="py-2.5 flex items-center justify-between gap-2">
-                  <div>
-                    <p className="font-mono font-bold text-gray-900">{s.invoiceNumber}</p>
-                    <p className="text-[11px] text-gray-500">
-                      {s.patientName || s.customerName || 'Walk-in'} &bull; {formatDate(s.date)}
+          <div className="divide-y divide-slate-100 text-xs">
+            {recentSalesList.length === 0 ? (
+              <div className="py-6 text-center text-neutral-500 font-medium">
+                No recent customer bills recorded yet.
+              </div>
+            ) : (
+              recentSalesList.map((s) => (
+                <div
+                  key={s.id || s.invoiceNumber}
+                  onClick={() => setSelectedInvoice(s)}
+                  className="py-2.5 flex items-center justify-between gap-2 hover:bg-slate-50/80 rounded-lg px-1.5 cursor-pointer transition-colors group"
+                >
+                  <div className="min-w-0">
+                    <p className="font-mono font-bold text-black text-xs group-hover:text-emerald-800 transition-colors">
+                      {s.invoiceNumber}
+                    </p>
+                    <p className="text-[11px] text-neutral-600 font-medium truncate mt-0.5">
+                      {s.patientName || s.customerName || 'Walk-in'} • {formatDate(s.date)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-gray-900">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-mono font-black text-black text-xs tabular-nums">
                       {formatCurrency(s.grandTotal)}
                     </span>
                     <button
                       type="button"
-                      onClick={() => setSelectedInvoice(s)}
-                      className="p-1 text-gray-400 hover:text-emerald-700"
-                      title="View Bill"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedInvoice(s);
+                      }}
+                      className="p-1 text-neutral-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-md cursor-pointer transition-colors"
+                      title="View Bill Details"
                     >
                       <Eye className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          </Card>
+              ))
+            )}
+          </div>
         </div>
 
-        {/* Recent Stock Activities Log */}
-        <div className="lg:col-span-4">
-          <Card>
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+        {/* 2. Stock Movements Audit Feed */}
+        <div className="lg:col-span-4 p-3.5 sm:p-4 rounded-xl border border-blue-200/90 bg-white shadow-2xs space-y-2.5">
+          <div className="flex items-center justify-between pb-2 border-b border-blue-100">
+            <div className="flex items-center gap-2">
+              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1 rounded-md shadow-2xs">
+                <Activity className="w-3.5 h-3.5" />
+              </span>
               <div>
-                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-blue-600" />
-                  Recent Stock Activities
+                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+                  Stock Audit Feed
                 </h3>
-                <p className="text-xs text-gray-500">Movement audit log</p>
+                <p className="text-[11px] text-neutral-600 font-medium">Verified warehouse movements</p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => navigate('/inventory')}
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span>History</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
 
-            <div className="divide-y divide-gray-100 mt-2 text-xs">
-              {recentActivitiesList.length === 0 ? (
-                <div className="py-6 text-center text-gray-400">
-                  No recent stock movements recorded.
-                </div>
-              ) : (
-                recentActivitiesList.map((act) => (
-                  <div key={act.stockHistoryId || act.id} className="py-2.5 flex items-center justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-gray-900 truncate max-w-[170px]">
-                        {act.reason || act.actionType}
-                      </p>
-                      <p className="text-[10px] text-gray-400">
-                        {act.employeeName || 'Staff'} &bull; {formatDate(act.timestamp)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span
-                        className={`font-mono text-xs font-bold ${
-                          act.changedQuantity > 0 ? 'text-[#1C9A58]' : 'text-rose-600'
-                        }`}
-                      >
-                        {act.changedQuantity > 0 ? `+${act.changedQuantity}` : act.changedQuantity}
-                      </span>
-                    </div>
+          <div className="divide-y divide-slate-100 text-xs">
+            {recentActivitiesList.length === 0 ? (
+              <div className="py-6 text-center text-neutral-500 font-medium">
+                No recent stock movements recorded.
+              </div>
+            ) : (
+              recentActivitiesList.map((act) => (
+                <div key={act.stockHistoryId || act.id} className="py-2.5 flex items-center justify-between gap-2 px-1">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-black text-xs truncate">
+                      {act.reason || act.actionType}
+                    </p>
+                    <p className="text-[10px] text-neutral-500 font-medium mt-0.5">
+                      {act.employeeName || 'Staff'} • {formatDate(act.timestamp)}
+                    </p>
                   </div>
-                ))
-              )}
-            </div>
-          </Card>
+                  <div className="shrink-0 text-right">
+                    <span
+                      className={`font-mono text-xs font-extrabold px-2 py-0.5 rounded-full border shadow-2xs ${
+                        act.changedQuantity > 0
+                          ? 'text-emerald-900 bg-emerald-100 border-emerald-300'
+                          : 'text-rose-900 bg-rose-100 border-rose-300'
+                      }`}
+                    >
+                      {act.changedQuantity > 0 ? `+${act.changedQuantity}` : act.changedQuantity}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
-        {/* Reorder Alerts */}
-        <div className="lg:col-span-4">
-          <Card>
-            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+        {/* 3. Reorder Recommendations */}
+        <div className="lg:col-span-4 p-3.5 sm:p-4 rounded-xl border border-indigo-200/90 bg-white shadow-2xs space-y-2.5">
+          <div className="flex items-center justify-between pb-2 border-b border-indigo-100">
+            <div className="flex items-center gap-2">
+              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-1 rounded-md shadow-2xs">
+                <Boxes className="w-3.5 h-3.5" />
+              </span>
               <div>
-                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                  <Boxes className="w-4 h-4 text-[#0F3A2C]" />
+                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
                   Reorder Alerts
                 </h3>
-                <p className="text-xs text-gray-500">Restock recommendations</p>
+                <p className="text-[11px] text-neutral-600 font-medium">Smart restock recommendations</p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => navigate('/inventory')}
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-900 flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span>Inventory</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
 
-            <div className="divide-y divide-gray-100 mt-2 text-xs">
-              {reorderAlertsList.length === 0 ? (
-                <div className="py-6 text-center text-gray-400">
-                  Inventory levels are optimal across all medicines.
-                </div>
-              ) : (
-                reorderAlertsList.map((m) => (
-                  <div key={m.medicineId || m.id} className="py-2.5 flex items-center justify-between gap-2">
-                    <div>
-                      <p className="font-bold text-gray-900">{m.name}</p>
-                      <p className="text-[10px] text-gray-400">{m.manufacturer || m.brand}</p>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="danger" size="sm">
-                        {m.availableStock} in stock
-                      </Badge>
-                      <p className="text-[9px] text-gray-400 mt-0.5">
-                        Alert: &le; {m.minStockAlert || 15}
-                      </p>
-                    </div>
+          <div className="divide-y divide-slate-100 text-xs">
+            {reorderAlertsList.length === 0 ? (
+              <div className="py-6 text-center text-neutral-500 font-medium">
+                Inventory levels are optimal across all catalog medicines.
+              </div>
+            ) : (
+              reorderAlertsList.map((m) => (
+                <div
+                  key={m.medicineId || m.id}
+                  onClick={() => setViewingMedicine(m)}
+                  className="py-2.5 flex items-center justify-between gap-2 px-1 hover:bg-slate-50/80 rounded-lg cursor-pointer transition-colors group"
+                >
+                  <div className="min-w-0">
+                    <p className="font-bold text-black text-xs group-hover:text-indigo-900 transition-colors truncate">
+                      {m.name}
+                    </p>
+                    <p className="text-[10px] text-neutral-500 font-medium truncate mt-0.5">
+                      {m.manufacturer || m.brand} • Target threshold: {m.minStockAlert || 15}
+                    </p>
                   </div>
-                ))
-              )}
-            </div>
-          </Card>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-900 border border-rose-300 shadow-2xs">
+                      {m.availableStock} in stock
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRestockMedicine(m);
+                      }}
+                      className="p-1 rounded bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-300 transition-colors cursor-pointer"
+                      title="Add Batch"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Invoice Modal when clicking on any recent sale */}
+      {/* ========================================================
+          MODALS INTEGRATED INTO DASHBOARD FOR SEAMLESS 1-CLICK UX
+          ======================================================== */}
+      {/* 1. Invoice Modal when clicking on any recent sale */}
       <InvoiceModal
         isOpen={Boolean(selectedInvoice)}
         onClose={() => setSelectedInvoice(null)}
@@ -602,6 +799,62 @@ export const Dashboard = () => {
           navigate('/pos');
         }}
       />
+
+      {/* 2. Medicine Specs Modal when clicking any alert medicine */}
+      {viewingMedicine && (
+        <MedicineDetails
+          isOpen={Boolean(viewingMedicine)}
+          onClose={() => setViewingMedicine(null)}
+          medicine={viewingMedicine}
+          batches={batches.filter((b) => b.medicineId === viewingMedicine.medicineId)}
+          allBatches={batches}
+          onEdit={() => navigate('/medicines')}
+          onAddBatch={(batchData, reason) => {
+            try {
+              addBatch(batchData, reason);
+              toast.showSuccess(`Batch added successfully!`);
+            } catch (err) {
+              toast.showError(err.message);
+            }
+          }}
+          onUpdateBatch={(batchId, batchData, reason) => {
+            try {
+              updateBatch(batchId, batchData, reason);
+              toast.showSuccess('Batch updated successfully!');
+            } catch (err) {
+              toast.showError(err.message);
+            }
+          }}
+          onDeleteBatch={(batchId, reason) => {
+            try {
+              deleteBatch(batchId, reason);
+              toast.showSuccess('Batch removed successfully!');
+            } catch (err) {
+              toast.showError(err.message);
+            }
+          }}
+          onAdjustStock={({ batchId, delta, actionType, reason }) => {
+            try {
+              adjustBatchStock(batchId, delta, actionType, reason);
+              toast.showSuccess('Stock adjustment applied!');
+            } catch (err) {
+              toast.showError(err.message);
+            }
+          }}
+        />
+      )}
+
+      {/* 3. Quick Restock Batch Form */}
+      {restockMedicine && (
+        <BatchForm
+          isOpen={Boolean(restockMedicine)}
+          onClose={() => setRestockMedicine(null)}
+          onSave={handleSaveBatch}
+          fixedMedicineId={restockMedicine.medicineId}
+          medicines={[restockMedicine]}
+          existingBatches={batches}
+        />
+      )}
     </div>
   );
 };

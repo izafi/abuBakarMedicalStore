@@ -103,3 +103,36 @@ export const canSellBatch = (batch) => {
   const qty = Number(batch.quantity) || 0;
   return days >= 0 && qty > 0;
 };
+
+/**
+ * Extract clean product name without redundant type or strength
+ * e.g. "Amoxil Syrup 125mg/5ml" (type: Syrup, strength: 125mg/5ml) -> "Amoxil"
+ * e.g. "Augmentin 625mg" -> "Augmentin"
+ * e.g. "Brufen 400mg" -> "Brufen"
+ */
+export const getCleanMedicineName = (med) => {
+  if (!med) return '';
+  if (med.brand && typeof med.brand === 'string' && med.brand.trim()) {
+    return med.brand.trim();
+  }
+
+  let clean = med.name || '';
+  const strength = (med.strength || '').trim();
+  const type = (med.type || '').trim();
+
+  if (strength) {
+    const escapedStrength = strength.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    clean = clean.replace(new RegExp(`\\b${escapedStrength}\\b`, 'gi'), '');
+    clean = clean.replace(new RegExp(escapedStrength, 'gi'), '');
+  }
+
+  if (type) {
+    const escapedType = type.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+    clean = clean.replace(new RegExp(`\\b${escapedType}\\b`, 'gi'), '');
+    clean = clean.replace(new RegExp(escapedType, 'gi'), '');
+  }
+
+  clean = clean.replace(/\s+/g, ' ').replace(/[-,/]+$/, '').trim();
+  return clean || med.name || '';
+};
+

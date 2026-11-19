@@ -26,8 +26,8 @@ export const SearchBar = ({
 
   return (
     <div className={`relative flex items-center w-full ${className}`}>
-      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-        <Search className="w-4 h-4 text-gray-400" />
+      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-black">
+        <Search className="w-4 h-4 text-black" />
       </div>
 
       <input
@@ -37,7 +37,7 @@ export const SearchBar = ({
         onChange={onChange}
         autoFocus={autoFocus}
         placeholder={placeholder}
-        className="w-full h-10 pl-10 pr-10 text-sm bg-white border border-gray-200 rounded-lg text-gray-800 placeholder-gray-400 transition-colors focus:outline-none focus:border-[#1C9A58] focus:ring-2 focus:ring-[#1C9A58]/20 shadow-2xs"
+        className="w-full h-10 pl-10 pr-10 text-sm bg-white border border-slate-300 rounded-lg text-black font-medium placeholder-neutral-500 transition-colors focus:outline-none focus:border-black focus:ring-1 focus:ring-black shadow-2xs"
       />
 
       {value ? (

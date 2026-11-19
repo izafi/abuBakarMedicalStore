@@ -29,14 +29,14 @@ export const BatchTable = ({
   const [sortField, setSortField] = useState('expiryDate');
   const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
+  const [itemsPerPage, setItemsPerPage] = useState(30);
 
   const canEdit = hasPermission('inventory', 'edit');
   const canDelete = hasPermission('inventory', 'delete');
 
   const handleSort = (field) => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortField(field);
       setSortDirection('asc');
@@ -72,123 +72,124 @@ export const BatchTable = ({
 
   // Pagination
   const totalPages = Math.ceil(sortedBatches.length / itemsPerPage) || 1;
+  const safePage = Math.min(currentPage, totalPages);
   const paginatedBatches = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
+    const start = (safePage - 1) * itemsPerPage;
     return sortedBatches.slice(start, start + itemsPerPage);
-  }, [sortedBatches, currentPage, itemsPerPage]);
+  }, [sortedBatches, safePage, itemsPerPage]);
 
   const getStatusBadge = (status, isExpired, isNearExpiry, daysLeft) => {
     if (isExpired || status === BATCH_STOCK_STATUS.EXPIRED) {
       return (
-        <Badge variant="danger" dot>
+        <Badge variant="danger" dot size="sm">
           Expired
         </Badge>
       );
     }
     if (status === BATCH_STOCK_STATUS.OUT_OF_STOCK) {
       return (
-        <Badge variant="default" dot>
+        <Badge variant="danger" dot size="sm">
           Out of Stock
         </Badge>
       );
     }
     if (isNearExpiry || status === BATCH_STOCK_STATUS.NEAR_EXPIRY) {
       return (
-        <Badge variant="warning" dot>
+        <Badge variant="warning" dot size="sm">
           Near Expiry ({daysLeft}d)
         </Badge>
       );
     }
     if (status === BATCH_STOCK_STATUS.LOW_STOCK) {
       return (
-        <Badge variant="warning" dot>
+        <Badge variant="warning" dot size="sm">
           Low Stock
         </Badge>
       );
     }
     return (
-      <Badge variant="success" dot>
+      <Badge variant="success" dot size="sm">
         In Stock
       </Badge>
     );
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs">
+    <div className="w-full bg-white rounded-xl border border-slate-300 shadow-xs overflow-hidden font-sans">
+      <div className="w-full overflow-x-auto no-scrollbar">
+        <table className="w-full text-left border-collapse table-auto text-xs">
           <thead>
-            <tr className="bg-gray-50/80 border-b border-gray-100 text-gray-500 uppercase tracking-wider font-semibold select-none">
+            <tr className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none">
               {showMedicineCol && (
                 <th
                   onClick={() => handleSort('medicineName')}
-                  className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition-colors"
+                  className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
                 >
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1 text-black font-bold">
                     <span>Medicine Master</span>
-                    <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                    <ArrowUpDown className="w-3 h-3 text-black shrink-0" />
                   </div>
                 </th>
               )}
 
               <th
                 onClick={() => handleSort('batchNumber')}
-                className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition-colors"
+                className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
               >
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1 text-black font-bold">
                   <span>Batch Number</span>
-                  <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                  <ArrowUpDown className="w-3 h-3 text-black shrink-0" />
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('quantity')}
-                className="py-3 px-4 text-center cursor-pointer hover:bg-gray-100/80 transition-colors"
+                className="py-2.5 px-3 text-center cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
               >
-                <div className="flex items-center justify-center gap-1.5">
+                <div className="flex items-center justify-center gap-1 text-black font-bold">
                   <span>Stock Quantity</span>
-                  <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                  <ArrowUpDown className="w-3 h-3 text-black shrink-0" />
                 </div>
               </th>
 
-              <th className="py-3 px-4">
+              <th className="py-2.5 px-3 whitespace-nowrap text-black font-bold">
                 <span>Cost / Selling</span>
               </th>
 
-              <th className="py-3 px-4">
+              <th className="py-2.5 px-3 whitespace-nowrap text-black font-bold">
                 <span>Rack / Shelf</span>
               </th>
 
               <th
                 onClick={() => handleSort('expiryDate')}
-                className="py-3 px-4 cursor-pointer hover:bg-gray-100/80 transition-colors"
+                className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
               >
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1 text-black font-bold">
                   <span>Expiry Date</span>
-                  <ArrowUpDown className="w-3 h-3 text-gray-400" />
+                  <ArrowUpDown className="w-3 h-3 text-black shrink-0" />
                 </div>
               </th>
 
-              <th className="py-3 px-4">
+              <th className="py-2.5 px-3 text-center whitespace-nowrap text-black font-bold">
                 <span>Stock Status</span>
               </th>
 
-              <th className="py-3 px-4 text-right">
+              <th className="py-2.5 px-3 text-right whitespace-nowrap text-black font-bold">
                 <span>Actions</span>
               </th>
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-gray-100 text-gray-700">
+          <tbody className="divide-y divide-slate-200 text-xs bg-white">
             {paginatedBatches.length === 0 ? (
               <tr>
                 <td
                   colSpan={showMedicineCol ? 8 : 7}
-                  className="py-12 text-center text-gray-400"
+                  className="py-12 text-center text-black"
                 >
-                  <Layers className="w-8 h-8 mx-auto mb-2 text-gray-300 stroke-[1.5]" />
-                  <p className="font-semibold text-gray-600">No batches found</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <Layers className="w-8 h-8 mx-auto mb-2 text-neutral-400 stroke-[1.5]" />
+                  <p className="font-bold text-black text-sm">No batches found</p>
+                  <p className="text-xs text-black font-medium mt-0.5">
                     Register a new batch to allocate stock to this medicine.
                   </p>
                 </td>
@@ -201,91 +202,105 @@ export const BatchTable = ({
                 return (
                   <tr
                     key={batch.batchId || batch.id}
-                    className={`hover:bg-gray-50/70 transition-colors duration-150 ${
+                    className={`hover:bg-slate-50 transition-colors ${
                       isExpired
-                        ? 'bg-red-50/20'
+                        ? 'bg-red-50/30'
                         : isNearExpiry
-                        ? 'bg-amber-50/20'
+                        ? 'bg-amber-50/30'
                         : ''
                     }`}
                   >
+                    {/* 1. Medicine Master */}
                     {showMedicineCol && (
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3">
                         <div>
-                          <p className="font-bold text-gray-900">
+                          <p className="font-bold text-black text-xs leading-tight">
                             {batch.medicineName}
                           </p>
-                          <p className="text-[10px] text-gray-400">
-                            {batch.medicineId} • {batch.category}
+                          <p className="text-[10px] text-black font-semibold font-mono mt-0.5 truncate max-w-[170px]">
+                            {batch.medicineId} • {batch.category || 'General'}
                           </p>
                         </div>
                       </td>
                     )}
 
-                    <td className="py-3 px-4">
+                    {/* 2. Batch Number */}
+                    <td className="py-2.5 px-3 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md text-xs">
+                        <span className="font-mono font-bold text-black bg-slate-100 px-2 py-0.5 rounded border border-slate-300 text-xs">
                           {batch.batchNumber || batch.batchNo}
                         </span>
                         {isExpired && (
                           <span
-                            title="EXPIRED BATCH: Cannot be sold"
-                            className="inline-flex items-center text-red-600 bg-red-100 px-1.5 py-0.5 rounded text-[10px] font-bold"
+                            title="EXPIRED BATCH: Blocked from dispensing"
+                            className="inline-flex items-center text-rose-800 bg-rose-100 border border-rose-300 px-1.5 py-0.2 rounded text-[10px] font-bold"
                           >
-                            <ShieldAlert className="w-3 h-3 mr-0.5" />
+                            <ShieldAlert className="w-3 h-3 mr-0.5 text-rose-600" />
                             BLOCKED
                           </span>
                         )}
                       </div>
                     </td>
 
-                    <td className="py-3 px-4 text-center">
-                      <span
-                        className={`font-bold px-2 py-0.5 rounded-full text-xs ${
-                          batch.quantity === 0
-                            ? 'bg-gray-100 text-gray-500'
-                            : isExpired
-                            ? 'bg-red-100 text-red-700 line-through'
-                            : batch.quantity <= 20
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-emerald-50 text-[#1C9A58]'
-                        }`}
-                      >
-                        {batch.quantity} units
-                      </span>
+                    {/* 3. Stock Quantity (Matching Medicine Counter Colorful Pills) */}
+                    <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                      {batch.quantity === 0 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-300">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
+                          0 units
+                        </span>
+                      ) : isExpired ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-900 border border-rose-300 line-through">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
+                          {batch.quantity} units
+                        </span>
+                      ) : batch.quantity <= 20 ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-300">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                          {batch.quantity} units
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-300">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                          {batch.quantity} units
+                        </span>
+                      )}
                     </td>
 
-                    <td className="py-3 px-4">
+                    {/* 4. Cost / Selling */}
+                    <td className="py-2.5 px-3 whitespace-nowrap">
                       <div className="space-y-0.5">
-                        <p className="text-gray-900 font-semibold">
+                        <p className="text-xs font-extrabold text-[#1C9A58] tabular-nums">
                           {formatCurrency(batch.sellingPrice)}
                         </p>
-                        <p className="text-[10px] text-gray-400">
+                        <p className="text-[10px] text-black font-semibold tabular-nums">
                           Cost: {formatCurrency(batch.purchasePrice)}
                         </p>
                       </div>
                     </td>
 
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1 text-gray-700">
-                        <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
-                        <span className="font-medium text-xs">
+                    {/* 5. Rack / Shelf */}
+                    <td className="py-2.5 px-3 whitespace-nowrap">
+                      <div className="flex items-center gap-1 text-black">
+                        <MapPin className="w-3.5 h-3.5 text-black shrink-0" />
+                        <span className="font-mono font-bold text-xs text-black">
                           {batch.rack || 'Rack A'}, {batch.shelf || 'Shelf 1'}
                         </span>
                       </div>
                     </td>
 
-                    <td className="py-3 px-4">
+                    {/* 6. Expiry Date */}
+                    <td className="py-2.5 px-3 whitespace-nowrap">
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-gray-400 shrink-0" />
+                          <Calendar className="w-3.5 h-3.5 text-black shrink-0" />
                           <span
-                            className={`font-medium ${
+                            className={`text-[11px] font-bold ${
                               isExpired
-                                ? 'text-red-600 font-bold'
+                                ? 'text-rose-600 font-extrabold'
                                 : isNearExpiry
-                                ? 'text-amber-700 font-bold'
-                                : 'text-gray-700'
+                                ? 'text-amber-700 font-extrabold'
+                                : 'text-black'
                             }`}
                           >
                             {formatDate(batch.expiryDate)}
@@ -293,12 +308,12 @@ export const BatchTable = ({
                         </div>
                         {batch.daysLeft !== undefined && (
                           <p
-                            className={`text-[10px] font-medium ${
+                            className={`text-[10px] font-bold ${
                               isExpired
-                                ? 'text-red-500'
+                                ? 'text-rose-600'
                                 : isNearExpiry
-                                ? 'text-amber-600'
-                                : 'text-gray-400'
+                                ? 'text-amber-700'
+                                : 'text-black font-semibold'
                             }`}
                           >
                             {isExpired
@@ -309,7 +324,8 @@ export const BatchTable = ({
                       </div>
                     </td>
 
-                    <td className="py-3 px-4">
+                    {/* 7. Stock Status */}
+                    <td className="py-2.5 px-3 text-center whitespace-nowrap">
                       {getStatusBadge(
                         batch.status,
                         isExpired,
@@ -318,41 +334,41 @@ export const BatchTable = ({
                       )}
                     </td>
 
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
+                    {/* 8. Actions (Readable Well-Sized Action Buttons) */}
+                    <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1">
                         {canEdit && onAdjustStock && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            iconLeft={Boxes}
+                          <button
+                            type="button"
                             onClick={() => onAdjustStock(batch)}
-                            title="Adjust / Update Stock"
-                            className="text-xs px-2 py-1"
+                            title="Adjust / Update Physical Stock"
+                            className="px-2.5 py-1 text-xs font-bold text-[#1C9A58] bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-300 rounded-md transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
                           >
-                            Stock
-                          </Button>
+                            <Boxes className="w-3.5 h-3.5 stroke-[2.2]" />
+                            <span>Stock</span>
+                          </button>
                         )}
 
                         {canEdit && onEditBatch && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            iconLeft={Edit2}
+                          <button
+                            type="button"
                             onClick={() => onEditBatch(batch)}
                             title="Edit Batch Specifications"
-                            className="p-1.5"
-                          />
+                            className="p-1 text-black hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors cursor-pointer"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 stroke-[2.2]" />
+                          </button>
                         )}
 
                         {canDelete && onDeleteBatch && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            iconLeft={Trash2}
+                          <button
+                            type="button"
                             onClick={() => onDeleteBatch(batch)}
-                            title="Delete Batch"
-                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50"
-                          />
+                            title="Delete Batch from Inventory"
+                            className="p-1 text-black hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 stroke-[2.2]" />
+                          </button>
                         )}
                       </div>
                     </td>
@@ -364,40 +380,62 @@ export const BatchTable = ({
         </table>
       </div>
 
-      {/* Pagination Footer */}
-      {totalPages > 1 && (
-        <div className="p-3 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+      {/* Pagination & Rows-Per-Page Footer (Matching Medicine Counter) */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 border-t border-slate-300 text-xs text-black font-semibold select-none">
+        <div className="flex items-center gap-3">
           <span>
-            Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
-            {Math.min(currentPage * itemsPerPage, sortedBatches.length)} of{' '}
-            {sortedBatches.length} batches
+            Showing <strong className="font-bold text-black">{(safePage - 1) * itemsPerPage + 1}</strong> to{' '}
+            <strong className="font-bold text-black">{Math.min(safePage * itemsPerPage, sortedBatches.length)}</strong> of{' '}
+            <strong className="font-bold text-black">{sortedBatches.length}</strong> batches
           </span>
 
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              className="p-1"
+          {/* Rows Per Page Selector */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-black font-bold text-xs">Show</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="bg-white border border-slate-300 rounded px-2 py-0.5 text-xs text-black font-bold focus:outline-none focus:border-black cursor-pointer"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </Button>
-            <span className="px-2 font-semibold text-gray-700">
-              Page {currentPage} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              className="p-1"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Button>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={30}>30</option>
+              <option value={50}>50</option>
+            </select>
+            <span className="text-black font-bold text-xs">per page</span>
           </div>
         </div>
-      )}
+
+        {/* Pagination Controls */}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={safePage === 1}
+            className="px-2.5 py-1 rounded border border-slate-300 bg-white text-black hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Prev</span>
+          </button>
+
+          <span className="px-2 text-xs font-bold text-black">
+            Page {safePage} of {totalPages}
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={safePage === totalPages}
+            className="px-2.5 py-1 rounded border border-slate-300 bg-white text-black hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <span>Next</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

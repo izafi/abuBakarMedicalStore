@@ -1,5 +1,18 @@
 const mongoose = require('mongoose');
 
+const MEDICINE_TYPES = [
+  'Tablet',
+  'Capsule',
+  'Syrup',
+  'Liquid',
+  'Injection',
+  'Cream',
+  'Drops',
+  'Inhaler',
+  'Ointment',
+  'Other',
+];
+
 const medicineSchema = new mongoose.Schema(
   {
     medicineId: {
@@ -11,7 +24,7 @@ const medicineSchema = new mongoose.Schema(
     },
     name: {
       type: String,
-      required: [true, 'Medicine brand name is required'],
+      required: [true, 'Medicine name is required'],
       trim: true,
       index: true,
     },
@@ -24,57 +37,74 @@ const medicineSchema = new mongoose.Schema(
     brand: {
       type: String,
       trim: true,
+      default: '',
     },
     formula: {
       type: String,
       trim: true,
+      default: '',
     },
     strength: {
       type: String,
+      required: [true, 'Strength is required (e.g. 500mg, 10ml)'],
       trim: true,
     },
     type: {
       type: String,
-      enum: [
-        'Tablet',
-        'Capsule',
-        'Syrup',
-        'Liquid',
-        'Injection',
-        'Cream',
-        'Drops',
-        'Inhaler',
-        'Ointment',
-        'Other',
-      ],
+      required: [true, 'Medicine type is required'],
+      enum: {
+        values: MEDICINE_TYPES,
+        message: '{VALUE} is not a valid medicine type',
+      },
       default: 'Tablet',
+      index: true,
     },
     category: {
       type: String,
+      required: [true, 'Category is required'],
+      trim: true,
       default: 'General',
       index: true,
     },
     usage: {
       type: String,
       trim: true,
+      default: '',
     },
     manufacturer: {
       type: String,
       trim: true,
+      default: '',
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Employee',
+      default: null,
+    },
+    updatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Employee',
+      default: null,
+    },
+    // Optional display/catalog defaults (Note: batch quantities are NOT stored here)
     sellingPrice: {
       type: Number,
-      required: [true, 'Selling price is required'],
+      default: 0,
       min: [0, 'Selling price cannot be negative'],
     },
     purchasePrice: {
       type: Number,
-      required: [true, 'Purchase price is required'],
+      default: 0,
       min: [0, 'Purchase price cannot be negative'],
     },
     rack: {
       type: String,
-      default: 'Rack A',
+      default: 'Rack A-1',
     },
     shelf: {
       type: String,
@@ -91,7 +121,7 @@ const medicineSchema = new mongoose.Schema(
   }
 );
 
-// Compound text search index
+// Compound text search index for fast text search
 medicineSchema.index({
   name: 'text',
   genericName: 'text',
@@ -101,3 +131,4 @@ medicineSchema.index({
 });
 
 module.exports = mongoose.model('Medicine', medicineSchema);
+module.exports.MEDICINE_TYPES = MEDICINE_TYPES;

@@ -1,19 +1,24 @@
 const mongoose = require('mongoose');
 
-const saleItemSchema = new mongoose.Schema(
+const PAYMENT_METHODS = ['Cash', 'Card'];
+const SALE_STATUSES = ['Completed', 'Cancelled', 'Refunded'];
+
+const embeddedItemSchema = new mongoose.Schema(
   {
     medicineId: { type: String, required: true },
-    batchId: { type: String, required: true },
     medicineName: { type: String, required: true },
-    genericName: { type: String },
-    formula: { type: String },
-    strength: { type: String },
+    genericName: { type: String, default: '' },
+    formula: { type: String, default: '' },
+    strength: { type: String, default: '' },
+    batchId: { type: String, required: true },
     batchNumber: { type: String, required: true },
     quantity: { type: Number, required: true, min: 1 },
     unitPrice: { type: Number, required: true, min: 0 },
+    discountPercent: { type: Number, default: 0, min: 0, max: 100 },
     discountPercentage: { type: Number, default: 0 },
-    discountAmount: { type: Number, default: 0 },
+    discountAmount: { type: Number, default: 0, min: 0 },
     subtotal: { type: Number, required: true },
+    total: { type: Number, required: true },
     finalTotal: { type: Number, required: true },
   },
   { _id: false }
@@ -28,29 +33,31 @@ const saleSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
-    date: {
-      type: Date,
-      default: Date.now,
-      index: true,
-    },
     patientName: {
       type: String,
       required: [true, 'Patient name is required'],
       trim: true,
       index: true,
     },
-    customerName: {
-      type: String,
-      trim: true,
-    },
     doctorName: {
       type: String,
-      required: [true, 'Prescribing doctor name is required'],
+      required: [true, 'Doctor name is required'],
       trim: true,
+      index: true,
     },
-    prescriptionDescription: {
+    prescription: {
       type: String,
       required: [true, 'Prescription description is required'],
+      trim: true,
+    },
+    prescriptionRef: {
+      type: String,
+      trim: true,
+      default: 'N/A',
+    },
+    // Compatibility aliases
+    prescriptionDescription: {
+      type: String,
       trim: true,
     },
     prescriptionReferenceNumber: {
@@ -58,21 +65,53 @@ const saleSchema = new mongoose.Schema(
       trim: true,
       default: 'N/A',
     },
+    employeeId: {
+      type: String,
+      required: [true, 'Employee identifier is required'],
+      index: true,
+    },
     employeeName: {
       type: String,
-      required: [true, 'Dispensing employee name is required'],
+      required: [true, 'Employee name is required'],
+      default: 'Staff Pharmacist',
     },
     employeeUsername: {
       type: String,
-    },
-    employeeId: {
-      type: String,
+      default: '',
     },
     paymentMethod: {
       type: String,
-      enum: ['Cash', 'Card', 'Debit/Credit Card', 'Online / EasyPaisa / JazzCash'],
+      required: [true, 'Payment method is required'],
+      enum: {
+        values: PAYMENT_METHODS,
+        message: '{VALUE} is not a valid payment method. Allowed: Cash, Card',
+      },
       default: 'Cash',
       index: true,
+    },
+    subtotal: {
+      type: Number,
+      required: [true, 'Subtotal is required'],
+      min: [0, 'Subtotal cannot be negative'],
+    },
+    totalDiscount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Discount cannot be negative'],
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Discount amount cannot be negative'],
+    },
+    finalAmount: {
+      type: Number,
+      required: [true, 'Final amount is required'],
+      min: [0, 'Final amount cannot be negative'],
+    },
+    grandTotal: {
+      type: Number,
+      min: [0, 'Grand total cannot be negative'],
     },
     amountReceived: {
       type: Number,
@@ -82,33 +121,33 @@ const saleSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    items: {
-      type: [saleItemSchema],
-      validate: [(val) => val.length > 0, 'Sale must include at least one medicine item'],
+    saleDateTime: {
+      type: Date,
+      default: Date.now,
+      index: true,
     },
-    subtotal: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
-    discountAmount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    taxAmount: {
-      type: Number,
-      default: 0,
-    },
-    grandTotal: {
-      type: Number,
-      required: true,
-      min: 0,
+    date: {
+      type: Date,
+      default: Date.now,
+      index: true,
     },
     status: {
       type: String,
-      enum: ['Completed', 'Cancelled', 'Refunded'],
+      enum: {
+        values: SALE_STATUSES,
+        message: '{VALUE} is not a valid status',
+      },
       default: 'Completed',
+      index: true,
+    },
+    items: {
+      type: [embeddedItemSchema],
+      validate: [(val) => val && val.length > 0, 'Sale must include at least one medicine item'],
+    },
+    idempotencyKey: {
+      type: String,
+      sparse: true,
+      index: true,
     },
   },
   {
@@ -116,4 +155,43 @@ const saleSchema = new mongoose.Schema(
   }
 );
 
+// Pre-save hook to keep aliases synchronized
+saleSchema.pre('save', function () {
+  if (!this.prescriptionDescription) {
+    this.prescriptionDescription = this.prescription;
+  }
+  if (!this.prescription) {
+    this.prescription = this.prescriptionDescription;
+  }
+
+  if (!this.prescriptionReferenceNumber) {
+    this.prescriptionReferenceNumber = this.prescriptionRef;
+  }
+  if (!this.prescriptionRef) {
+    this.prescriptionRef = this.prescriptionReferenceNumber;
+  }
+
+  if (this.grandTotal === undefined || this.grandTotal === null) {
+    this.grandTotal = this.finalAmount;
+  }
+  if (this.finalAmount === undefined || this.finalAmount === null) {
+    this.finalAmount = this.grandTotal;
+  }
+
+  if (this.discountAmount === undefined || this.discountAmount === null) {
+    this.discountAmount = this.totalDiscount;
+  }
+  if (this.totalDiscount === undefined || this.totalDiscount === null) {
+    this.totalDiscount = this.discountAmount;
+  }
+
+  if (!this.date) {
+    this.date = this.saleDateTime || new Date();
+  }
+  if (!this.saleDateTime) {
+    this.saleDateTime = this.date || new Date();
+  }
+});
+
 module.exports = mongoose.model('Sale', saleSchema);
+module.exports.PAYMENT_METHODS = PAYMENT_METHODS;

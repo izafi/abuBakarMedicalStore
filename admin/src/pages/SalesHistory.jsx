@@ -10,17 +10,25 @@ import {
   CreditCard,
   Banknote,
   Receipt,
+  X,
+  RotateCcw,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp,
+  Percent,
+  CheckCircle2,
+  Filter,
+  Plus,
 } from 'lucide-react';
-import { Card } from '../components/common/Card';
-import { Button } from '../components/common/Button';
-import { Table } from '../components/common/Table';
-import { Badge } from '../components/common/Badge';
+import { useNavigate } from 'react-router-dom';
 import { InvoiceModal } from '../components/common/InvoiceModal';
 import { useSales } from '../hooks/useSales';
 import { useAuth } from '../hooks/useAuth';
 import { formatCurrency, formatDate } from '../utils/formatters';
 
 export const SalesHistory = () => {
+  const navigate = useNavigate();
   const { sales } = useSales();
   const { users } = useAuth();
 
@@ -29,7 +37,12 @@ export const SalesHistory = () => {
   const [employeeFilter, setEmployeeFilter] = useState('all');
   const [dateRangeFilter, setDateRangeFilter] = useState('all'); // all, today, week, month
   const [paymentFilter, setPaymentFilter] = useState('all'); // all, Cash, Card
-  const [sortOrder, setSortOrder] = useState('newest'); // newest, oldest
+  const [sortField, setSortField] = useState('date'); // date, grandTotal, invoiceNumber
+  const [sortOrder, setSortOrder] = useState('desc'); // desc (newest), asc (oldest)
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Modal State
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -38,7 +51,7 @@ export const SalesHistory = () => {
   const filteredSales = useMemo(() => {
     let result = [...sales];
 
-    // Search by: Invoice Number, Patient Name, Medicine Name
+    // Search by: Invoice Number, Patient Name, Customer Name, Doctor Name, Medicine Name, Batch Number
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter((s) => {
@@ -91,15 +104,29 @@ export const SalesHistory = () => {
       }
     }
 
-    // Sort by Newest or Oldest
+    // Sort
     result.sort((a, b) => {
-      const timeA = new Date(a.date).getTime();
-      const timeB = new Date(b.date).getTime();
-      return sortOrder === 'newest' ? timeB - timeA : timeA - timeB;
+      let valA = a[sortField];
+      let valB = b[sortField];
+
+      if (sortField === 'date') {
+        valA = new Date(a.date).getTime();
+        valB = new Date(b.date).getTime();
+      } else if (sortField === 'grandTotal') {
+        valA = Number(a.grandTotal) || 0;
+        valB = Number(valB) || 0;
+      } else if (typeof valA === 'string') {
+        valA = valA.toLowerCase();
+        valB = (valB || '').toLowerCase();
+      }
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
     });
 
     return result;
-  }, [sales, searchQuery, employeeFilter, dateRangeFilter, paymentFilter, sortOrder]);
+  }, [sales, searchQuery, employeeFilter, dateRangeFilter, paymentFilter, sortField, sortOrder]);
 
   // Aggregate stats from filtered sales
   const stats = useMemo(() => {
@@ -123,274 +150,591 @@ export const SalesHistory = () => {
     };
   }, [filteredSales]);
 
-  // Table Columns
-  const columns = [
-    {
-      header: 'Invoice #',
-      accessor: 'invoiceNumber',
-      render: (s) => (
-        <div>
-          <span className="font-mono font-bold text-gray-900 text-xs">
-            {s.invoiceNumber}
-          </span>
-          <div className="flex items-center gap-1 text-[10px] text-gray-400 mt-0.5">
-            <span>{formatDate(s.date)}</span>
-            <span>&bull;</span>
-            <span>{new Date(s.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: 'Patient & Doctor',
-      render: (s) => (
-        <div className="space-y-0.5">
-          <p className="font-bold text-gray-900 text-xs flex items-center gap-1">
-            <User className="w-3 h-3 text-[#1C9A58]" />
-            {s.patientName || s.customerName || 'Walk-in'}
-          </p>
-          <p className="text-[11px] text-gray-500 flex items-center gap-1">
-            <Stethoscope className="w-3 h-3 text-gray-400" />
-            {s.doctorName || 'Self / OTC'}
-          </p>
-        </div>
-      ),
-    },
-    {
-      header: 'Medicines Dispensed',
-      render: (s) => {
-        const count = s.items?.length || 0;
-        const totalQty = s.items?.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0) || 0;
-        const firstTwo = s.items?.slice(0, 2) || [];
-        const remaining = count - firstTwo.length;
+  // Handle Header Sort Click
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortOrder('desc');
+    }
+  };
 
-        return (
-          <div className="space-y-0.5 max-w-[200px]">
-            <div className="text-xs font-semibold text-gray-800 truncate">
-              {firstTwo.map((i) => i.medicineName || i.name).join(', ')}
-              {remaining > 0 && (
-                <span className="text-[10px] text-gray-400 font-normal"> +{remaining} more</span>
-              )}
-            </div>
-            <div className="text-[10px] text-gray-500 flex items-center gap-1">
-              <Pill className="w-2.5 h-2.5 text-emerald-600" />
-              <span>{count} line item{count > 1 ? 's' : ''} &bull; <strong>{totalQty} units</strong></span>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      header: 'Subtotal / Disc',
-      align: 'right',
-      render: (s) => (
-        <div className="text-right text-xs">
-          <p className="font-mono text-gray-600">{formatCurrency(s.subtotal)}</p>
-          {s.discountAmount > 0 ? (
-            <p className="font-mono text-[10px] text-emerald-600 font-semibold">
-              -{formatCurrency(s.discountAmount)}
-            </p>
-          ) : (
-            <p className="font-mono text-[10px] text-gray-400">-</p>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: 'Final Amount',
-      align: 'right',
-      render: (s) => (
-        <div className="text-right">
-          <span className="font-mono font-black text-sm text-[#0F3A2C]">
-            {formatCurrency(s.grandTotal)}
-          </span>
-        </div>
-      ),
-    },
-    {
-      header: 'Payment',
-      align: 'center',
-      render: (s) => (
-        <Badge
-          variant={s.paymentMethod === 'Card' ? 'primary' : 'success'}
-          size="sm"
-          className="font-bold"
-        >
-          {s.paymentMethod === 'Card' ? (
-            <span className="flex items-center gap-1">
-              <CreditCard className="w-3 h-3" /> Card
-            </span>
-          ) : (
-            <span className="flex items-center gap-1">
-              <Banknote className="w-3 h-3" /> Cash
-            </span>
-          )}
-        </Badge>
-      ),
-    },
-    {
-      header: 'Dispensed By',
-      render: (s) => (
-        <div className="text-xs">
-          <p className="font-semibold text-gray-900">{s.employeeName || s.cashierName}</p>
-          {s.employeeUsername && (
-            <p className="font-mono text-[10px] text-gray-400">@{s.employeeUsername}</p>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: 'Actions',
-      align: 'right',
-      render: (s) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="outline"
-            size="sm"
-            iconLeft={Eye}
-            onClick={() => setSelectedInvoice(s)}
-            className="text-xs py-1 px-2.5 h-8"
-          >
-            Invoice
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconLeft={Printer}
-            onClick={() => {
-              setSelectedInvoice(s);
-              setTimeout(() => window.print(), 300);
-            }}
-            title="Print Receipt"
-            className="text-xs py-1 px-2 h-8 text-gray-600 hover:text-emerald-700"
-          />
-        </div>
-      ),
-    },
-  ];
+  // Reset All Filters
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setEmployeeFilter('all');
+    setDateRangeFilter('all');
+    setPaymentFilter('all');
+    setSortField('date');
+    setSortOrder('desc');
+    setCurrentPage(1);
+  };
+
+  // Paginated Sales
+  const totalPages = Math.ceil(filteredSales.length / pageSize) || 1;
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedSales = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredSales.slice(start, start + pageSize);
+  }, [filteredSales, safePage, pageSize]);
 
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4 font-sans select-none">
+      {/* Top Header & New Sale Action */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-            <Receipt className="w-7 h-7 text-[#1C9A58]" />
-            Sales History & Audit Logs
+          <h1 className="text-xl font-bold text-black tracking-tight flex items-center gap-2">
+            <Receipt className="w-5 h-5 text-[#1C9A58] stroke-[2.2]" />
+            <span>Sales History & Audit Logs</span>
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-xs text-black font-semibold mt-0.5">
             Immutable financial records of all completed counter dispensing and prescription sales.
           </p>
         </div>
 
-        {/* Aggregate Quick Metric Badges */}
-        <div className="flex items-center gap-3">
-          <div className="px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-2xs">
-            <p className="text-[10px] uppercase font-bold text-gray-400">Completed Sales</p>
-            <p className="text-lg font-black text-gray-900">{stats.count}</p>
+        <button
+          type="button"
+          onClick={() => navigate('/counter')}
+          className="bg-[#1C9A58] hover:bg-[#158046] text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+        >
+          <Plus className="w-4 h-4 stroke-[2.5]" />
+          <span>New Dispensing Sale</span>
+        </button>
+      </div>
+
+      {/* =========================================================================
+          ADJUSTED KPI STATE CARDS (Small, Sleek, Colorful & Responsive)
+          ========================================================================= */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        {/* Card 1: Completed Sales */}
+        <div
+          onClick={handleResetFilters}
+          className="p-3 rounded-xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/30 hover:border-emerald-400 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer flex flex-col justify-between gap-1.5 group"
+          title="Click to view all completed sales"
+        >
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider truncate text-emerald-950">
+              Completed Sales
+            </span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-emerald-300 bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105">
+              <Receipt className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
+            </div>
           </div>
-          <div className="px-3.5 py-2 rounded-xl bg-white border border-gray-200 shadow-2xs">
-            <p className="text-[10px] uppercase font-bold text-gray-400">Total Net Revenue</p>
-            <p className="text-lg font-black text-[#1C9A58]">{formatCurrency(stats.revenue)}</p>
+          <div>
+            <p className="text-base sm:text-lg lg:text-xl font-extrabold tabular-nums tracking-tight text-black truncate">
+              {stats.count}
+            </p>
+            <p className="text-[10px] sm:text-[11px] text-neutral-700 font-semibold truncate mt-0.5">
+              Billed transactions
+            </p>
+          </div>
+        </div>
+
+        {/* Card 2: Total Net Revenue */}
+        <div
+          onClick={() => {
+            setSortField('grandTotal');
+            setSortOrder('desc');
+          }}
+          className="p-3 rounded-xl border border-teal-200/90 bg-gradient-to-br from-teal-50/70 via-white to-emerald-50/30 hover:border-teal-400 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer flex flex-col justify-between gap-1.5 group"
+          title="Click to sort by highest revenue sales"
+        >
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider truncate text-teal-950">
+              Net Revenue
+            </span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-teal-300 bg-teal-100 text-teal-800 flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105">
+              <Banknote className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
+            </div>
+          </div>
+          <div>
+            <p className="text-base sm:text-lg lg:text-xl font-extrabold tabular-nums tracking-tight text-[#1C9A58] truncate">
+              {formatCurrency(stats.revenue)}
+            </p>
+            <p className="text-[10px] sm:text-[11px] text-neutral-700 font-semibold truncate mt-0.5">
+              Counter collections
+            </p>
+          </div>
+        </div>
+
+        {/* Card 3: Total Units Dispensed */}
+        <div
+          className="p-3 rounded-xl border border-blue-200/90 bg-gradient-to-br from-blue-50/70 via-white to-cyan-50/30 hover:border-blue-400 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer flex flex-col justify-between gap-1.5 group"
+          title="Total quantity of medicine packs dispensed"
+        >
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider truncate text-blue-950">
+              Units Dispensed
+            </span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-blue-300 bg-blue-100 text-blue-800 flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105">
+              <Pill className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
+            </div>
+          </div>
+          <div>
+            <p className="text-base sm:text-lg lg:text-xl font-extrabold tabular-nums tracking-tight text-black truncate">
+              {stats.units} <span className="text-xs font-bold text-neutral-800">units</span>
+            </p>
+            <p className="text-[10px] sm:text-[11px] text-neutral-700 font-semibold truncate mt-0.5">
+              Across {stats.count} invoices
+            </p>
+          </div>
+        </div>
+
+        {/* Card 4: Total Discount Given */}
+        <div
+          onClick={() => setSearchQuery('')}
+          className="p-3 rounded-xl border border-amber-200/90 bg-gradient-to-br from-amber-50/70 via-white to-yellow-50/30 hover:border-amber-400 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xs cursor-pointer flex flex-col justify-between gap-1.5 group"
+          title="Customer savings granted"
+        >
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[11px] font-bold uppercase tracking-wider truncate text-amber-950">
+              Total Discounts
+            </span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-amber-300 bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 shadow-2xs transition-transform group-hover:scale-105">
+              <Percent className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.2]" />
+            </div>
+          </div>
+          <div>
+            <p className="text-base sm:text-lg lg:text-xl font-extrabold tabular-nums tracking-tight text-amber-950 truncate">
+              {formatCurrency(stats.discount)}
+            </p>
+            <p className="text-[10px] sm:text-[11px] text-neutral-700 font-semibold truncate mt-0.5">
+              Customer savings
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Search & Filter Toolbar */}
-      <Card>
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-            {/* Search Input */}
-            <div className="md:col-span-5 relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                <Search className="w-4 h-4" />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by invoice #, patient, doctor, medicine, or batch..."
-                className="w-full pl-9 pr-8 py-2 text-xs border border-gray-200 rounded-xl bg-white focus:outline-none focus:border-[#1C9A58] focus:ring-2 focus:ring-[#1C9A58]/20 transition-all"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-gray-400 hover:text-gray-600"
-                >
-                  &times;
-                </button>
-              )}
-            </div>
-
-            {/* Employee Filter */}
-            <div className="md:col-span-2">
-              <select
-                value={employeeFilter}
-                onChange={(e) => setEmployeeFilter(e.target.value)}
-                className="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl bg-white text-gray-700 focus:outline-none focus:border-[#1C9A58]"
-              >
-                <option value="all">All Employees</option>
-                {users.map((u) => (
-                  <option key={u.id || u.employeeId} value={u.name}>
-                    {u.name} ({u.role})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Date Range Filter */}
-            <div className="md:col-span-2">
-              <select
-                value={dateRangeFilter}
-                onChange={(e) => setDateRangeFilter(e.target.value)}
-                className="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl bg-white text-gray-700 focus:outline-none focus:border-[#1C9A58]"
-              >
-                <option value="all">All Dates</option>
-                <option value="today">Today's Sales</option>
-                <option value="week">Last 7 Days</option>
-                <option value="month">This Month</option>
-              </select>
-            </div>
-
-            {/* Payment Method Filter */}
-            <div className="md:col-span-2">
-              <select
-                value={paymentFilter}
-                onChange={(e) => setPaymentFilter(e.target.value)}
-                className="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl bg-white text-gray-700 focus:outline-none focus:border-[#1C9A58]"
-              >
-                <option value="all">All Payments</option>
-                <option value="Cash">Cash Only</option>
-                <option value="Card">Card Only</option>
-              </select>
-            </div>
-
-            {/* Sort Order Toggle */}
-            <div className="md:col-span-1">
+      {/* =========================================================================
+          SEARCH & FILTER TOOLBAR
+          ========================================================================= */}
+      <div className="bg-white rounded-xl border border-slate-300 shadow-xs p-2.5 space-y-2">
+        <div className="flex flex-col sm:flex-row gap-2 items-center justify-between">
+          {/* Search Input with Instant Clear */}
+          <div className="relative flex-1 w-full">
+            <Search className="w-4 h-4 text-black absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none stroke-[2]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search by invoice #, patient, doctor, medicine, or batch..."
+              className="w-full h-9 pl-9 pr-8 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1C9A58] text-black font-medium transition-colors"
+            />
+            {searchQuery && (
               <button
                 type="button"
-                onClick={() => setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest')}
-                className="w-full py-2 px-2 text-xs border border-gray-200 rounded-xl bg-white hover:bg-gray-50 flex items-center justify-center gap-1 font-semibold text-gray-700 transition-colors"
-                title={`Sorted by: ${sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}`}
+                onClick={() => {
+                  setSearchQuery('');
+                  setCurrentPage(1);
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-black hover:bg-slate-200 rounded transition-colors cursor-pointer"
+                title="Clear search"
               >
-                <ArrowUpDown className="w-3.5 h-3.5 text-gray-500" />
-                <span className="capitalize">{sortOrder}</span>
+                <X className="w-3.5 h-3.5 stroke-[2.2]" />
+              </button>
+            )}
+          </div>
+
+          {/* Filter Dropdowns */}
+          <div className="flex items-center gap-1.5 w-full sm:w-auto flex-wrap">
+            {/* Employee Filter */}
+            <select
+              value={employeeFilter}
+              onChange={(e) => {
+                setEmployeeFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-9 px-3 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-black font-bold focus:outline-none focus:border-black cursor-pointer transition-colors"
+            >
+              <option value="all">All Employees</option>
+              {users.map((u) => (
+                <option key={u.id || u.employeeId} value={u.name}>
+                  {u.name} ({u.role})
+                </option>
+              ))}
+            </select>
+
+            {/* Date Range Filter */}
+            <select
+              value={dateRangeFilter}
+              onChange={(e) => {
+                setDateRangeFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-9 px-3 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-black font-bold focus:outline-none focus:border-black cursor-pointer transition-colors"
+            >
+              <option value="all">All Dates</option>
+              <option value="today">Today's Sales</option>
+              <option value="week">Last 7 Days</option>
+              <option value="month">This Month</option>
+            </select>
+
+            {/* Payment Filter */}
+            <select
+              value={paymentFilter}
+              onChange={(e) => {
+                setPaymentFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-9 px-3 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-black font-bold focus:outline-none focus:border-black cursor-pointer transition-colors"
+            >
+              <option value="all">All Payments</option>
+              <option value="Cash">Cash Only</option>
+              <option value="Card">Card Only</option>
+            </select>
+
+            {/* Sort Order Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+              }}
+              className="h-9 px-3 text-xs border border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-center gap-1.5 font-bold text-black transition-colors cursor-pointer shrink-0"
+              title={`Sorted by: ${sortOrder === 'desc' ? 'Newest / Highest' : 'Oldest / Lowest'}`}
+            >
+              <ArrowUpDown className="w-3.5 h-3.5 text-black stroke-[2.2]" />
+              <span className="capitalize">{sortOrder === 'desc' ? 'Newest' : 'Oldest'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Filter Chips & Reset Ribbon */}
+        <div className="flex items-center justify-between gap-2 flex-wrap pt-1 border-t border-slate-200 text-xs">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-bold text-black uppercase tracking-wider">Quick:</span>
+            {[
+              { label: 'All Invoices', action: () => handleResetFilters(), active: dateRangeFilter === 'all' && paymentFilter === 'all' && !searchQuery },
+              { label: "Today's Sales", action: () => { setDateRangeFilter('today'); setCurrentPage(1); }, active: dateRangeFilter === 'today' },
+              { label: 'Cash Payments', action: () => { setPaymentFilter('Cash'); setCurrentPage(1); }, active: paymentFilter === 'Cash' },
+              { label: 'Card Payments', action: () => { setPaymentFilter('Card'); setCurrentPage(1); }, active: paymentFilter === 'Card' },
+            ].map((chip, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={chip.action}
+                className={`px-2 py-0.5 rounded-md text-[11px] font-bold border transition-all cursor-pointer ${
+                  chip.active
+                    ? 'bg-black text-white border-black shadow-2xs'
+                    : 'bg-slate-50 text-black border-slate-300 hover:border-black hover:bg-slate-100'
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
+          {(searchQuery || employeeFilter !== 'all' || dateRangeFilter !== 'all' || paymentFilter !== 'all') && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="text-xs text-rose-600 hover:text-rose-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3 stroke-[2.2]" />
+              <span>Reset Filters</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* =========================================================================
+          MAIN SALES TABLE (Matching Medicine Counter & Inventory Standards)
+          ========================================================================= */}
+      <div className="w-full bg-white rounded-xl border border-slate-300 shadow-xs overflow-hidden">
+        <div className="w-full overflow-x-auto no-scrollbar">
+          <table className="w-full text-left border-collapse table-auto text-xs">
+            <thead>
+              <tr className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none">
+                {/* 1. Invoice Number */}
+                <th
+                  onClick={() => handleSort('invoiceNumber')}
+                  className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                >
+                  <div className="flex items-center gap-1 text-black font-bold">
+                    <span>Invoice #</span>
+                    <ArrowUpDown className="w-3 h-3 text-black shrink-0 stroke-[2.2]" />
+                  </div>
+                </th>
+
+                {/* 2. Patient & Doctor */}
+                <th className="py-2.5 px-3 text-black font-bold whitespace-nowrap">
+                  <span>Patient & Doctor</span>
+                </th>
+
+                {/* 3. Medicines Dispensed */}
+                <th className="py-2.5 px-3 text-black font-bold whitespace-nowrap">
+                  <span>Medicines Dispensed</span>
+                </th>
+
+                {/* 4. Subtotal / Discount */}
+                <th className="py-2.5 px-3 text-right text-black font-bold whitespace-nowrap">
+                  <span>Subtotal / Disc</span>
+                </th>
+
+                {/* 5. Final Amount */}
+                <th
+                  onClick={() => handleSort('grandTotal')}
+                  className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                >
+                  <div className="flex items-center justify-end gap-1 text-black font-bold">
+                    <span>Final Amount</span>
+                    <ArrowUpDown className="w-3 h-3 text-black shrink-0 stroke-[2.2]" />
+                  </div>
+                </th>
+
+                {/* 6. Payment Method */}
+                <th className="py-2.5 px-3 text-center text-black font-bold whitespace-nowrap">
+                  <span>Payment</span>
+                </th>
+
+                {/* 7. Dispensed By */}
+                <th className="py-2.5 px-3 text-black font-bold whitespace-nowrap">
+                  <span>Dispensed By</span>
+                </th>
+
+                {/* 8. Actions */}
+                <th className="py-2.5 px-3 text-right text-black font-bold whitespace-nowrap min-w-[120px]">
+                  <span>Actions</span>
+                </th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-200 text-xs bg-white">
+              {paginatedSales.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-black">
+                    <Receipt className="w-8 h-8 mx-auto mb-2 text-neutral-400 stroke-[1.8]" />
+                    <p className="font-bold text-black text-sm">No sales invoices found</p>
+                    <p className="text-xs text-black font-medium mt-0.5">
+                      Try adjusting your search query or quick filter selection.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="mt-3 px-3 py-1.5 text-xs font-bold bg-black text-white rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
+                    >
+                      Reset Filters
+                    </button>
+                  </td>
+                </tr>
+              ) : (
+                paginatedSales.map((s) => {
+                  const itemCount = s.items?.length || 0;
+                  const totalQty = s.items?.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0) || 0;
+                  const firstTwo = s.items?.slice(0, 2) || [];
+                  const remaining = itemCount - firstTwo.length;
+
+                  return (
+                    <tr
+                      key={s.id || s.invoiceNumber}
+                      onClick={() => setSelectedInvoice(s)}
+                      className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                    >
+                      {/* 1. Invoice Number & Timestamp */}
+                      <td className="py-2.5 px-3">
+                        <span className="font-mono font-bold text-black text-xs group-hover:text-[#1C9A58] transition-colors block">
+                          {s.invoiceNumber}
+                        </span>
+                        <div className="flex items-center gap-1 text-[11px] text-black font-semibold mt-0.5 whitespace-nowrap">
+                          <Calendar className="w-3 h-3 text-black shrink-0 stroke-[2.2]" />
+                          <span>{formatDate(s.date)}</span>
+                          <span>&bull;</span>
+                          <span>{new Date(s.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </td>
+
+                      {/* 2. Patient & Prescribing Doctor */}
+                      <td className="py-2.5 px-3">
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-black text-xs flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-[#1C9A58] stroke-[2.2] shrink-0" />
+                            <span>{s.patientName || s.customerName || 'Walk-in Customer'}</span>
+                          </p>
+                          <p className="text-[11px] text-black font-semibold flex items-center gap-1.5">
+                            <Stethoscope className="w-3.5 h-3.5 text-teal-700 stroke-[2] shrink-0" />
+                            <span>{s.doctorName || 'Self / OTC'}</span>
+                          </p>
+                        </div>
+                      </td>
+
+                      {/* 3. Medicines Dispensed */}
+                      <td className="py-2.5 px-3">
+                        <div className="space-y-0.5 max-w-[220px]">
+                          <div className="text-xs font-bold text-black truncate">
+                            {firstTwo.map((i) => i.medicineName || i.name).join(', ')}
+                            {remaining > 0 && (
+                              <span className="text-[10px] text-black font-bold ml-1 bg-slate-100 px-1 py-0.2 rounded border border-slate-300">
+                                +{remaining} more
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-black font-semibold flex items-center gap-1">
+                            <Pill className="w-3.5 h-3.5 text-emerald-700 stroke-[2] shrink-0" />
+                            <span>
+                              {itemCount} line item{itemCount > 1 ? 's' : ''} &bull;{' '}
+                              <strong className="text-black font-bold">{totalQty} units</strong>
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* 4. Subtotal / Discount */}
+                      <td className="py-2.5 px-3 text-right">
+                        <div className="text-xs space-y-0.5">
+                          <p className="font-mono text-black font-bold">{formatCurrency(s.subtotal)}</p>
+                          {s.discountAmount > 0 ? (
+                            <p className="font-mono text-[11px] text-emerald-700 font-bold">
+                              -{formatCurrency(s.discountAmount)}
+                            </p>
+                          ) : (
+                            <p className="font-mono text-[10px] text-black font-bold">-</p>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 5. Final Amount */}
+                      <td className="py-2.5 px-3 text-right">
+                        <span className="font-mono font-black text-sm text-[#0F3A2C] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300 inline-block shadow-2xs">
+                          {formatCurrency(s.grandTotal)}
+                        </span>
+                      </td>
+
+                      {/* 6. Payment Badge */}
+                      <td className="py-2.5 px-3 text-center">
+                        {s.paymentMethod === 'Card' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-950 border border-blue-300 shadow-2xs whitespace-nowrap">
+                            <CreditCard className="w-3.5 h-3.5 text-blue-800 stroke-[2.2]" />
+                            <span>Card</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-2xs whitespace-nowrap">
+                            <Banknote className="w-3.5 h-3.5 text-emerald-800 stroke-[2.2]" />
+                            <span>Cash</span>
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 7. Dispensed By */}
+                      <td className="py-2.5 px-3">
+                        <div className="text-xs">
+                          <p className="font-bold text-black">{s.employeeName || s.cashierName || 'Staff'}</p>
+                          <p className="text-[10px] text-black font-semibold mt-0.5 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 inline-block">
+                            {s.employeeId || (s.employeeUsername ? `@${s.employeeUsername}` : 'Cashier')}
+                          </p>
+                        </div>
+                      </td>
+
+                      {/* 8. Actions (Readable Icons, Cursor Pointer, No-Cutoff) */}
+                      <td className="py-2.5 px-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedInvoice(s)}
+                            className="text-xs font-bold text-black bg-white hover:bg-slate-100 border border-slate-300 hover:border-black rounded-lg px-2.5 py-1.5 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                            title="View full invoice details"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-black stroke-[2.2]" />
+                            <span>Invoice</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedInvoice(s);
+                              setTimeout(() => window.print(), 300);
+                            }}
+                            className="p-1.5 hover:bg-slate-100 rounded-lg border border-slate-300 hover:border-black cursor-pointer transition-colors shadow-2xs text-black hover:text-[#1C9A58]"
+                            title="Print thermal receipt"
+                          >
+                            <Printer className="w-3.5 h-3.5 stroke-[2.2]" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* =========================================================================
+            PAGINATION & METRICS FOOTER (Matching Medicine Counter & Catalog)
+            ========================================================================= */}
+        <div className="px-3.5 py-2.5 border-t border-slate-300 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs select-none">
+          {/* Showing Count */}
+          <div className="text-black font-bold text-xs flex items-center gap-2">
+            <span>
+              Showing{' '}
+              <strong className="text-black font-black">
+                {filteredSales.length === 0 ? 0 : (safePage - 1) * pageSize + 1}
+              </strong>{' '}
+              to{' '}
+              <strong className="text-black font-black">
+                {Math.min(safePage * pageSize, filteredSales.length)}
+              </strong>{' '}
+              of <strong className="text-black font-black">{filteredSales.length}</strong> invoices
+            </span>
+          </div>
+
+          {/* Page Controls & Page Size */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-black font-bold">Show</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="h-7 px-2 text-xs bg-white border border-slate-300 rounded font-bold text-black focus:outline-none cursor-pointer"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
+              <span className="text-[11px] text-black font-bold">per page</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safePage === 1}
+                className={`p-1 rounded border transition-colors flex items-center gap-1 text-xs font-bold px-2 cursor-pointer ${
+                  safePage === 1
+                    ? 'border-slate-200 text-neutral-300 cursor-not-allowed bg-slate-100'
+                    : 'border-slate-300 bg-white text-black hover:bg-slate-100 hover:border-black shadow-2xs'
+                }`}
+              >
+                <ChevronLeft className="w-3.5 h-3.5 stroke-[2.2]" />
+                <span className="hidden sm:inline">Prev</span>
+              </button>
+
+              <span className="text-xs font-bold text-black px-2">
+                Page {safePage} of {totalPages}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage >= totalPages}
+                className={`p-1 rounded border transition-colors flex items-center gap-1 text-xs font-bold px-2 cursor-pointer ${
+                  safePage >= totalPages
+                    ? 'border-slate-200 text-neutral-300 cursor-not-allowed bg-slate-100'
+                    : 'border-slate-300 bg-white text-black hover:bg-slate-100 hover:border-black shadow-2xs'
+                }`}
+              >
+                <span className="hidden sm:inline">Next</span>
+                <ChevronRight className="w-3.5 h-3.5 stroke-[2.2]" />
               </button>
             </div>
           </div>
         </div>
-      </Card>
-
-      {/* Main Historical Sales Table */}
-      <Card>
-        <Table
-          columns={columns}
-          data={filteredSales}
-          onRowClick={(s) => setSelectedInvoice(s)}
-          emptyMessage="No historical sales invoices found matching your filters."
-        />
-      </Card>
+      </div>
 
       {/* Printable Invoice Modal (Immutable View) */}
       <InvoiceModal

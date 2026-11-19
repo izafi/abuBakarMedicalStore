@@ -1,6 +1,19 @@
 const { body, validationResult } = require('express-validator');
 const ApiResponse = require('../utils/apiResponse');
 
+const MEDICINE_TYPES = [
+  'Tablet',
+  'Capsule',
+  'Syrup',
+  'Liquid',
+  'Injection',
+  'Cream',
+  'Drops',
+  'Inhaler',
+  'Ointment',
+  'Other',
+];
+
 /**
  * Middleware that handles express-validator result and returns uniform error structure
  */
@@ -67,10 +80,115 @@ const validateChangePassword = [
   handleValidationErrors,
 ];
 
+/**
+ * Validation rules for creating a medicine
+ */
+const validateCreateMedicine = [
+  body('name').trim().notEmpty().withMessage('Medicine name is required'),
+  body('genericName').trim().notEmpty().withMessage('Generic name is required'),
+  body('strength').trim().notEmpty().withMessage('Strength is required (e.g. 500mg, 10ml)'),
+  body('type')
+    .optional()
+    .isIn(MEDICINE_TYPES)
+    .withMessage(`Type must be one of: ${MEDICINE_TYPES.join(', ')}`),
+  body('category').optional().trim(),
+  body('sellingPrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Selling price cannot be negative'),
+  body('purchasePrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Purchase price cannot be negative'),
+  handleValidationErrors,
+];
+
+/**
+ * Validation rules for updating a medicine
+ */
+const validateUpdateMedicine = [
+  body('name').optional().trim().notEmpty().withMessage('Medicine name cannot be empty'),
+  body('genericName').optional().trim().notEmpty().withMessage('Generic name cannot be empty'),
+  body('type')
+    .optional()
+    .isIn(MEDICINE_TYPES)
+    .withMessage(`Type must be one of: ${MEDICINE_TYPES.join(', ')}`),
+  body('sellingPrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Selling price cannot be negative'),
+  body('purchasePrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Purchase price cannot be negative'),
+  handleValidationErrors,
+];
+
+/**
+ * Validation rules for creating a batch
+ */
+const validateCreateBatch = [
+  body('medicineId').trim().notEmpty().withMessage('Parent medicineId is required'),
+  body('batchNumber').trim().notEmpty().withMessage('Batch number is required'),
+  body('manufacturingDate').notEmpty().withMessage('Manufacturing date is required'),
+  body('expiryDate').notEmpty().withMessage('Expiry date is required'),
+  body('purchasePrice')
+    .notEmpty()
+    .withMessage('Purchase price is required')
+    .isFloat({ min: 0 })
+    .withMessage('Purchase price cannot be negative'),
+  body('sellingPrice')
+    .notEmpty()
+    .withMessage('Selling price is required')
+    .isFloat({ min: 0 })
+    .withMessage('Selling price cannot be negative'),
+  body('quantity')
+    .notEmpty()
+    .withMessage('Quantity is required')
+    .isFloat({ min: 0 })
+    .withMessage('Quantity cannot be negative'),
+  handleValidationErrors,
+];
+
+/**
+ * Validation rules for updating a batch
+ */
+const validateUpdateBatch = [
+  body('batchNumber').optional().trim().notEmpty().withMessage('Batch number cannot be empty'),
+  body('purchasePrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Purchase price cannot be negative'),
+  body('sellingPrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Selling price cannot be negative'),
+  body('quantity')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Quantity cannot be negative'),
+  handleValidationErrors,
+];
+
+/**
+ * Validation rules for Secure Checkout Verification
+ */
+const validateCheckoutSale = [
+  body('employeePassword')
+    .optional()
+    .trim(),
+  handleValidationErrors,
+];
+
 module.exports = {
   validateRegister,
   validateLogin,
   validateVerifyPassword,
   validateChangePassword,
+  validateCreateMedicine,
+  validateUpdateMedicine,
+  validateCreateBatch,
+  validateUpdateBatch,
+  validateCheckoutSale,
   handleValidationErrors,
 };

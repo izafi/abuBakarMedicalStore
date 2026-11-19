@@ -1,8 +1,16 @@
 import { useState } from 'react';
+import {
+  Plus,
+  Minus,
+  RefreshCw,
+  AlertCircle,
+  Boxes,
+  Check,
+  FileText,
+  PackageCheck,
+  ArrowRight,
+} from 'lucide-react';
 import { Modal } from '../common/Modal';
-import { Button } from '../common/Button';
-import { Input } from '../common/Input';
-import { Plus, Minus, RefreshCw, AlertCircle } from 'lucide-react';
 import { STOCK_ACTION_TYPES } from '../../utils/constants';
 
 export const StockAdjustModal = ({
@@ -84,31 +92,81 @@ export const StockAdjustModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Adjust Stock: ${batch.batchNumber || batch.batchNo}`}
-      subtitle={`Medicine: ${batch.medicineName} • Current stock: ${currentQty} units`}
+      title={
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 via-[#1C9A58] to-teal-400 text-white shadow-xs flex items-center justify-center shrink-0">
+            <Boxes className="w-5 h-5 drop-shadow-xs" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-base sm:text-lg font-bold text-black tracking-tight leading-tight">
+                Adjust Stock: {batch.batchNumber || batch.batchNo}
+              </span>
+              <span className="bg-blue-100 text-blue-900 border border-blue-300 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-2xs">
+                Physical Inventory
+              </span>
+            </div>
+            <p className="text-xs text-neutral-700 font-medium mt-0.5">
+              Medicine: <strong className="text-black font-semibold">{batch.medicineName || 'Pharmaceutical'}</strong> • Current on-shelf:{' '}
+              <strong className="text-black font-bold">{currentQty} units</strong>
+            </p>
+          </div>
+        </div>
+      }
       size="lg"
       footer={
-        <>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleSave}
-            disabled={numAmount <= 0 && operation !== 'SET'}
-          >
-            Apply Stock Update
-          </Button>
-        </>
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-2 text-xs font-semibold text-neutral-800 hidden sm:flex">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span>Fields marked with <strong className="text-rose-600">*</strong> are mandatory</span>
+          </div>
+          <div className="flex items-center gap-2.5 ml-auto">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xs font-bold px-4 py-2 rounded-lg border border-slate-300 text-black hover:bg-slate-100 cursor-pointer transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={(numAmount <= 0 && operation !== 'SET') || newCalculatedQty < 0}
+              className="bg-gradient-to-r from-emerald-600 via-[#1C9A58] to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs px-5 py-2 rounded-lg shadow-xs hover:shadow-sm cursor-pointer transition-all flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Check className="w-4 h-4 stroke-[2.5]" />
+              <span>Apply Stock Update</span>
+            </button>
+          </div>
+        </div>
       }
     >
-      <form onSubmit={handleSave} className="space-y-4">
-        {/* Operation Selector */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
-            Adjustment Operation
-          </label>
-          <div className="grid grid-cols-3 gap-2">
+      <form onSubmit={handleSave} className="space-y-3.5">
+        {/* ========================================================
+            CARD 1: CHOOSE ADJUSTMENT OPERATION (THEMED TABS)
+            ======================================================== */}
+        <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50/50 via-white to-emerald-50/20 shadow-2xs space-y-3 transition-all">
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-1 rounded-md shadow-2xs">
+                <Boxes className="w-3.5 h-3.5" />
+              </span>
+              <div>
+                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+                  1. Adjustment Operation
+                </h3>
+                <p className="text-[11px] text-neutral-800 font-medium">
+                  Select whether you are adding incoming stock, removing units, or resetting the shelf count
+                </p>
+              </div>
+            </div>
+            <span className="text-[11px] font-bold text-black bg-slate-100 px-2 py-0.5 rounded border border-slate-300 shadow-2xs">
+              {operation === 'ADD' ? 'Adding (+)' : operation === 'REMOVE' ? 'Removing (-)' : 'Recount (=)'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* 1. Add Stock */}
             <button
               type="button"
               onClick={() => {
@@ -116,16 +174,27 @@ export const StockAdjustModal = ({
                 setError('');
                 setReason('New shipment delivery intake');
               }}
-              className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 text-xs font-bold ${
+              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
                 operation === 'ADD'
-                  ? 'border-[#1C9A58] bg-emerald-50/70 text-[#0F3A2C]'
-                  : 'border-gray-200 hover:bg-gray-50 text-gray-600'
+                  ? 'border-2 border-emerald-500 bg-gradient-to-br from-emerald-50 via-white to-teal-50/30 text-emerald-950 shadow-xs ring-1 ring-emerald-400'
+                  : 'border border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/30 text-slate-700'
               }`}
             >
-              <Plus className="w-4 h-4 text-[#1C9A58]" />
-              <span>Add Stock (+)</span>
+              <div className="flex items-center justify-between">
+                <span className="p-1 rounded-lg bg-emerald-100 text-emerald-700">
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  Inbound
+                </span>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-black">Add Stock (+)</p>
+                <p className="text-[10px] text-neutral-600 font-medium">New shipment delivery</p>
+              </div>
             </button>
 
+            {/* 2. Remove Stock */}
             <button
               type="button"
               onClick={() => {
@@ -133,16 +202,27 @@ export const StockAdjustModal = ({
                 setError('');
                 setReason('Damaged / broken container disposal');
               }}
-              className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 text-xs font-bold ${
+              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
                 operation === 'REMOVE'
-                  ? 'border-red-500 bg-red-50/70 text-red-900'
-                  : 'border-gray-200 hover:bg-gray-50 text-gray-600'
+                  ? 'border-2 border-rose-500 bg-gradient-to-br from-rose-50 via-white to-red-50/30 text-rose-950 shadow-xs ring-1 ring-rose-400'
+                  : 'border border-slate-200 bg-white hover:border-rose-300 hover:bg-rose-50/30 text-slate-700'
               }`}
             >
-              <Minus className="w-4 h-4 text-red-500" />
-              <span>Remove Stock (-)</span>
+              <div className="flex items-center justify-between">
+                <span className="p-1 rounded-lg bg-rose-100 text-rose-700">
+                  <Minus className="w-4 h-4 stroke-[2.5]" />
+                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200">
+                  Outbound
+                </span>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-black">Remove Stock (-)</p>
+                <p className="text-[10px] text-neutral-600 font-medium">Damage / write-off</p>
+              </div>
             </button>
 
+            {/* 3. Set Exact Count */}
             <button
               type="button"
               onClick={() => {
@@ -150,86 +230,145 @@ export const StockAdjustModal = ({
                 setError('');
                 setReason('Physical stock audit count verification');
               }}
-              className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 text-xs font-bold ${
+              className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
                 operation === 'SET'
-                  ? 'border-blue-500 bg-blue-50/70 text-blue-900'
-                  : 'border-gray-200 hover:bg-gray-50 text-gray-600'
+                  ? 'border-2 border-blue-500 bg-gradient-to-br from-blue-50 via-white to-indigo-50/30 text-blue-950 shadow-xs ring-1 ring-blue-400'
+                  : 'border border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/30 text-slate-700'
               }`}
             >
-              <RefreshCw className="w-4 h-4 text-blue-500" />
-              <span>Set Count (=)</span>
+              <div className="flex items-center justify-between">
+                <span className="p-1 rounded-lg bg-blue-100 text-blue-700">
+                  <RefreshCw className="w-4 h-4 stroke-[2.5]" />
+                </span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200">
+                  Audit
+                </span>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-black">Set Count (=)</p>
+                <p className="text-[10px] text-neutral-600 font-medium">Shelf recount</p>
+              </div>
             </button>
           </div>
         </div>
 
-        {/* Quantity Input & Realtime Preview Card */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
-          <Input
-            label={
-              operation === 'ADD'
-                ? 'Units to Add'
-                : operation === 'REMOVE'
-                ? 'Units to Remove'
-                : 'Exact Count on Shelf'
-            }
-            type="number"
-            min="0"
-            required
-            value={amount}
-            onChange={(e) => {
-              setAmount(e.target.value);
-              setError('');
-            }}
-            placeholder="e.g. 20"
-            error={error}
-          />
+        {/* ========================================================
+            CARD 2: SPECIFY UNITS & LIVE REALTIME CALCULATION
+            ======================================================== */}
+        <div className="p-3.5 sm:p-4 rounded-xl border border-blue-200/90 bg-gradient-to-br from-blue-50/50 via-white to-indigo-50/20 shadow-2xs space-y-3 transition-all">
+          <div className="flex items-center justify-between pb-1.5 border-b border-blue-100">
+            <div className="flex items-center gap-2">
+              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1 rounded-md shadow-2xs">
+                <PackageCheck className="w-3.5 h-3.5" />
+              </span>
+              <div>
+                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+                  2. Units Quantity & Shelf Preview
+                </h3>
+                <p className="text-[11px] text-neutral-800 font-medium">
+                  Enter quantity and review computed final shelf count
+                </p>
+              </div>
+            </div>
+          </div>
 
-          <div className="p-3 bg-gray-50 rounded-xl border border-gray-200/70 text-xs space-y-1.5">
-            <p className="text-gray-500 font-medium">Stock Calculation Preview</p>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Current Stock:</span>
-              <span className="font-bold text-gray-800">{currentQty} units</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Stock Delta:</span>
-              <span
-                className={`font-bold ${
-                  delta > 0
-                    ? 'text-[#1C9A58]'
-                    : delta < 0
-                    ? 'text-red-500'
-                    : 'text-gray-500'
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+            {/* Quantity Input */}
+            <div>
+              <label className="flex items-center gap-1 text-xs font-bold text-black mb-1">
+                <span>
+                  {operation === 'ADD'
+                    ? 'Units to Add (+)'
+                    : operation === 'REMOVE'
+                    ? 'Units to Remove (-)'
+                    : 'Exact Units Count on Shelf (=)'}
+                </span>
+                <span className="text-rose-600">*</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                required
+                value={amount}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setError('');
+                }}
+                placeholder="e.g. 20"
+                className={`w-full h-10 px-3.5 text-xs sm:text-sm font-bold bg-white border rounded-xl text-black focus:outline-none focus:ring-1 transition-all ${
+                  error
+                    ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-200 bg-rose-50/20'
+                    : 'border-slate-300 hover:border-blue-400 focus:border-blue-600 focus:ring-blue-600/30'
                 }`}
-              >
-                {delta > 0 ? `+${delta}` : delta} units
-              </span>
+              />
+              {error ? (
+                <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" /> {error}
+                </p>
+              ) : (
+                <span className="text-[11px] text-neutral-700 font-medium mt-1 block">
+                  Positive integer units count
+                </span>
+              )}
             </div>
-            <div className="flex justify-between pt-1 border-t border-gray-200">
-              <span className="font-semibold text-gray-900">New Shelf Stock:</span>
-              <span
-                className={`font-bold text-sm ${
-                  newCalculatedQty < 0 ? 'text-red-600' : 'text-[#1C9A58]'
-                }`}
-              >
-                {newCalculatedQty} units
-              </span>
+
+            {/* Realtime Live Calculation Card */}
+            <div className="p-3 bg-white rounded-xl border border-blue-200/90 shadow-2xs text-xs space-y-1.5">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                <span className="text-[11px] font-bold text-black uppercase tracking-wider">
+                  Calculation Preview
+                </span>
+                <span className="text-[10px] text-neutral-500 font-medium">Live Audit</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-neutral-700 font-medium">Current Shelf Stock:</span>
+                <span className="font-bold text-black">{currentQty} units</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-neutral-700 font-medium">Adjustment Delta:</span>
+                <span
+                  className={`font-bold ${
+                    delta > 0
+                      ? 'text-emerald-700'
+                      : delta < 0
+                      ? 'text-rose-600'
+                      : 'text-neutral-500'
+                  }`}
+                >
+                  {delta > 0 ? `+${delta}` : delta} units
+                </span>
+              </div>
+              <div className="flex justify-between items-center pt-1.5 border-t border-slate-100">
+                <span className="font-bold text-black">New Shelf Stock:</span>
+                <span
+                  className={`font-extrabold text-sm tabular-nums ${
+                    newCalculatedQty < 0 ? 'text-rose-600' : 'text-[#1C9A58]'
+                  }`}
+                >
+                  {newCalculatedQty} units
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
         {newCalculatedQty < 0 && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-700 text-xs">
-            <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-800 text-xs font-semibold shadow-2xs">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
             <span>
-              Negative stock violation! You cannot reduce stock by more than the currently available units ({currentQty}).
+              Negative stock violation! You cannot reduce stock by more than currently available units ({currentQty}).
             </span>
           </div>
         )}
 
-        {/* Audit Reason */}
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-            Audit Reason (Recorded in Stock History) <span className="text-red-500">*</span>
+        {/* ========================================================
+            CARD 3: AUDIT REASON & QUICK REASON TAGS (SLATE THEME)
+            ======================================================== */}
+        <div className="p-3.5 sm:p-4 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2.5">
+          <label className="flex items-center gap-1 text-xs font-bold text-black">
+            <FileText className="w-3.5 h-3.5 text-neutral-600" />
+            <span>Audit Reason (Recorded in Stock History)</span>
+            <span className="text-rose-600">*</span>
           </label>
           <input
             type="text"
@@ -240,20 +379,33 @@ export const StockAdjustModal = ({
               setError('');
             }}
             placeholder="State the reason for this physical count adjustment"
-            className="w-full h-10 px-3 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1C9A58] focus:border-transparent text-gray-900 mb-2"
+            className="w-full h-9 px-3 text-xs font-semibold bg-white border border-slate-300 hover:border-emerald-400 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/30 rounded-lg text-black transition-all"
           />
 
-          <div className="flex flex-wrap gap-1.5">
-            {reasonSuggestions.map((sug) => (
-              <button
-                key={sug}
-                type="button"
-                onClick={() => setReason(sug)}
-                className="px-2 py-0.5 rounded-md text-[10px] bg-gray-100 hover:bg-emerald-50 hover:text-[#0F3A2C] text-gray-600 transition-colors"
-              >
-                + {sug}
-              </button>
-            ))}
+          <div>
+            <span className="text-[11px] font-bold text-neutral-600 block mb-1">Quick Select Reasons:</span>
+            <div className="flex flex-wrap gap-1.5">
+              {reasonSuggestions.map((sug) => {
+                const isSelected = reason === sug;
+                return (
+                  <button
+                    key={sug}
+                    type="button"
+                    onClick={() => {
+                      setReason(sug);
+                      setError('');
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-600 text-white shadow-2xs ring-1 ring-emerald-400'
+                        : 'bg-slate-50 text-black border border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/60'
+                    }`}
+                  >
+                    + {sug}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </form>

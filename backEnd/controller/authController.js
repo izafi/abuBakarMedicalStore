@@ -240,6 +240,15 @@ const verifyPassword = asyncHandler(async (req, res) => {
     return ApiResponse.error(res, 'Authenticated employee session not found.', ['User not found'], 401);
   }
 
+  if (employee.status !== 'Active') {
+    return ApiResponse.error(
+      res,
+      'Employee account is inactive. Inactive employees cannot authorize checkout.',
+      ['Account is inactive'],
+      403
+    );
+  }
+
   const isMatch = await employee.matchPassword(password);
   if (!isMatch) {
     return ApiResponse.error(

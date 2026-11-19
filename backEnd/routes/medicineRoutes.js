@@ -2,22 +2,63 @@ const express = require('express');
 const {
   getMedicines,
   getMedicineById,
+  getCategories,
+  getTypes,
   createMedicine,
   updateMedicine,
   deleteMedicine,
 } = require('../controller/medicineController');
+const {
+  searchCounterMedicines,
+  getMedicineCounterDetails,
+  getAvailableBatches,
+  getCounterCatalog,
+} = require('../controller/medicineCounterController');
 const { authenticate, optionalAuth } = require('../middleware/authMiddleware');
 const { checkPermission } = require('../middleware/permissionMiddleware');
+const {
+  validateCreateMedicine,
+  validateUpdateMedicine,
+} = require('../middleware/validator');
 
 const router = express.Router();
 
-// Allow public/optionalAuth viewing for Medicine Counter, require auth for CRUD
+// 1. Medicine Counter & Sub-path Endpoints (Mounted BEFORE /:id)
+router.get('/counter/catalog', optionalAuth, getCounterCatalog);
+router.get('/search', optionalAuth, searchCounterMedicines);
+router.get('/categories', optionalAuth, getCategories);
+router.get('/types', optionalAuth, getTypes);
+
+// 2. Medicine Details & Batch Selection for POS Counter
+router.get('/:id/details', optionalAuth, getMedicineCounterDetails);
+router.get('/:id/available-batches', optionalAuth, getAvailableBatches);
+
+// 3. Core Medicine Endpoints
 router.get('/', optionalAuth, getMedicines);
 router.get('/:id', optionalAuth, getMedicineById);
 
-// Protected mutation routes
-router.post('/', authenticate, checkPermission('medicines', 'add'), createMedicine);
-router.put('/:id', authenticate, checkPermission('medicines', 'edit'), updateMedicine);
-router.delete('/:id', authenticate, checkPermission('medicines', 'delete'), deleteMedicine);
+// 4. Protected Mutation Endpoints
+router.post(
+  '/',
+  authenticate,
+  checkPermission('medicines', 'add'),
+  validateCreateMedicine,
+  createMedicine
+);
+
+router.put(
+  '/:id',
+  authenticate,
+  checkPermission('medicines', 'edit'),
+  validateUpdateMedicine,
+  updateMedicine
+);
+
+router.delete(
+  '/:id',
+  authenticate,
+  checkPermission('medicines', 'delete'),
+  deleteMedicine
+);
 
 module.exports = router;

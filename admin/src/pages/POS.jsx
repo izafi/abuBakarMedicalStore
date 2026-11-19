@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import {
-  Sparkles,
+  PackageSearch,
   Layers,
   MapPin,
   Clock,
@@ -118,7 +118,7 @@ export const POS = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[620px] overflow-y-auto pr-1">
             {availableMedicines.length === 0 ? (
               <div className="sm:col-span-2 py-16 text-center text-gray-400 bg-white rounded-2xl border border-gray-100 p-6">
-                <Sparkles className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                <PackageSearch className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                 <p className="font-semibold text-gray-700">No sellable medicines found</p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   Try adjusting your search or add incoming stock in the Inventory module.

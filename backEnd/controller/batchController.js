@@ -1,5 +1,7 @@
+const mongoose = require('mongoose');
 const Batch = require('../models/Batch');
 const Medicine = require('../models/Medicine');
+const Sale = require('../models/Sale');
 const StockHistory = require('../models/StockHistory');
 const ApiResponse = require('../utils/apiResponse');
 const asyncHandler = require('../utils/asyncHandler');
@@ -22,53 +24,136 @@ const computeStatus = (batch, minAlert = 15, nearExpiryDays = 60) => {
 };
 
 /**
- * @desc    Get all batches with filters
+ * Helper to enrich batch object with medicine metadata and saleability flag
+ */
+const enrichBatch = (batch) => {
+  const bObj = batch.toObject ? batch.toObject() : batch;
+  const med = bObj.medicineId && typeof bObj.medicineId === 'object' ? bObj.medicineId : null;
+  const computedStatus = computeStatus(bObj, med?.minStockAlert || 15);
+
+  return {
+    ...bObj,
+    id: bObj._id,
+    status: computedStatus,
+    medicineName: med ? med.name : 'Unknown Medicine',
+    medicineCode: med ? med.medicineId : bObj.medicineCode || '',
+    genericName: med ? med.genericName : '',
+    brand: med ? med.brand : '',
+    formula: med ? med.formula : '',
+    strength: med ? med.strength : '',
+    category: med ? med.category : 'General',
+    canSell: computedStatus !== 'Expired' && bObj.quantity > 0,
+    availableStock: bObj.quantity,
+  };
+};
+
+/**
+ * @desc    Get all batches with filters, search, pagination, and sorting
  * @route   GET /api/v1/batches
  * @access  Public / Private ('inventory.view')
  */
 const getBatches = asyncHandler(async (req, res) => {
-  const { search, status, medicineId } = req.query;
+  const {
+    search,
+    q,
+    status,
+    medicineId,
+    sortBy = 'expiryDate',
+    sortOrder = 'asc',
+    order,
+    page = 1,
+    limit,
+    paginate,
+  } = req.query;
+
   const filter = {};
 
-  if (medicineId) {
-    filter.medicineId = medicineId;
+  // Filter by medicine (accepts ObjectId or string code like MED-1001)
+  if (medicineId && medicineId !== 'all') {
+    if (mongoose.Types.ObjectId.isValid(medicineId)) {
+      filter.$or = [{ medicineId: medicineId }, { medicineCode: medicineId }];
+    } else {
+      const parentMed = await Medicine.findOne({ medicineId });
+      if (parentMed) {
+        filter.$or = [{ medicineId: parentMed._id }, { medicineCode: medicineId }];
+      } else {
+        filter.medicineCode = medicineId;
+      }
+    }
   }
 
+  // Filter by status
   if (status && status !== 'all') {
     filter.status = status;
   }
 
-  if (search && search.trim()) {
-    filter.$or = [
-      { batchNumber: { $regex: search.trim(), $options: 'i' } },
-      { supplier: { $regex: search.trim(), $options: 'i' } },
-      { location: { $regex: search.trim(), $options: 'i' } },
+  // Search keyword (batchNumber, supplier, rack, shelf)
+  const queryStr = (search || q || '').trim();
+  if (queryStr) {
+    const searchRegex = { $regex: queryStr, $options: 'i' };
+    const searchConditions = [
+      { batchNumber: searchRegex },
+      { supplier: searchRegex },
+      { rack: searchRegex },
+      { shelf: searchRegex },
+      { location: searchRegex },
+      { batchId: searchRegex },
     ];
+    if (filter.$or) {
+      filter.$and = [{ $or: filter.$or }, { $or: searchConditions }];
+      delete filter.$or;
+    } else {
+      filter.$or = searchConditions;
+    }
   }
 
-  const batches = await Batch.find(filter).sort({ expiryDate: 1 });
+  // Sorting
+  const sortDirection = (order || sortOrder).toLowerCase() === 'desc' ? -1 : 1;
+  const sortOptions = {};
+  sortOptions[sortBy] = sortDirection;
 
-  // Enrich with parent medicine details
-  const medIds = [...new Set(batches.map((b) => b.medicineId))];
-  const meds = await Medicine.find({ medicineId: { $in: medIds } });
-  const medMap = new Map(meds.map((m) => [m.medicineId, m]));
+  // Pagination
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const isPaginationRequested = limit !== undefined && limit !== 'all' && parseInt(limit, 10) > 0;
+  const limitNum = isPaginationRequested ? parseInt(limit, 10) : 0;
 
-  const enriched = batches.map((b) => {
-    const parent = medMap.get(b.medicineId);
-    const minAlert = parent ? parent.minStockAlert : 15;
-    const computedStatus = computeStatus(b, minAlert);
+  const total = await Batch.countDocuments(filter);
 
-    return {
-      ...b.toObject(),
-      status: computedStatus,
-      medicineName: parent ? parent.name : 'Unknown Medicine',
-      genericName: parent ? parent.genericName : '',
-      category: parent ? parent.category : 'General',
-      canSell: computedStatus !== 'Expired' && b.quantity > 0,
-    };
+  let query = Batch.find(filter)
+    .populate('medicineId', 'name genericName brand formula strength type category medicineId minStockAlert')
+    .sort(sortOptions);
+
+  if (limitNum > 0) {
+    query = query.skip((pageNum - 1) * limitNum).limit(limitNum);
+  }
+
+  const batches = await query;
+  const enrichedBatches = batches.map(enrichBatch);
+
+  const totalPages = limitNum > 0 ? Math.ceil(total / limitNum) : 1;
+  const paginationData = {
+    total,
+    page: pageNum,
+    limit: limitNum > 0 ? limitNum : total,
+    pages: totalPages,
+    hasNextPage: pageNum < totalPages,
+    hasPrevPage: pageNum > 1,
+  };
+
+  if (paginate === 'true') {
+    return ApiResponse.success(res, 'Batches retrieved successfully', {
+      batches: enrichedBatches,
+      pagination: paginationData,
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: 'Batches retrieved successfully',
+    data: enrichedBatches,
+    pagination: paginationData,
+    count: enrichedBatches.length,
   });
-
-  return ApiResponse.success(res, 'Batches retrieved successfully', enriched);
 });
 
 /**
@@ -77,36 +162,90 @@ const getBatches = asyncHandler(async (req, res) => {
  * @access  Public / Private
  */
 const getBatchesByMedicine = asyncHandler(async (req, res) => {
-  const batches = await Batch.find({ medicineId: req.params.medicineId }).sort({ expiryDate: 1 });
-  const medicine = await Medicine.findOne({ medicineId: req.params.medicineId });
+  const { medicineId } = req.params;
 
-  const enriched = batches.map((b) => {
-    const computedStatus = computeStatus(b, medicine?.minStockAlert || 15);
-    return {
-      ...b.toObject(),
-      status: computedStatus,
-      canSell: computedStatus !== 'Expired' && b.quantity > 0,
-    };
-  });
+  let queryFilter;
+  if (mongoose.Types.ObjectId.isValid(medicineId)) {
+    queryFilter = { $or: [{ medicineId: medicineId }, { medicineCode: medicineId }] };
+  } else {
+    const med = await Medicine.findOne({ medicineId });
+    if (!med) {
+      return ApiResponse.error(res, 'Medicine not found', ['No medicine matches identifier'], 404);
+    }
+    queryFilter = { $or: [{ medicineId: med._id }, { medicineCode: med.medicineId }] };
+  }
 
+  const batches = await Batch.find(queryFilter)
+    .populate('medicineId', 'name genericName brand formula strength type category medicineId minStockAlert')
+    .sort({ expiryDate: 1 });
+
+  const enriched = batches.map(enrichBatch);
   return ApiResponse.success(res, 'Medicine batches retrieved', enriched);
 });
 
 /**
- * @desc    Get single batch details
+ * @desc    Get near-expiry batches
+ * @route   GET /api/v1/batches/near-expiry
+ * @access  Public / Private
+ */
+const getNearExpiryBatches = asyncHandler(async (req, res) => {
+  const days = Number(req.query.days) || 60;
+  const now = new Date();
+  const thresholdDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+  const batches = await Batch.find({
+    expiryDate: { $gte: now, $lte: thresholdDate },
+  })
+    .populate('medicineId', 'name genericName brand formula strength type category medicineId minStockAlert')
+    .sort({ expiryDate: 1 });
+
+  const enriched = batches.map(enrichBatch);
+  return ApiResponse.success(
+    res,
+    `Found ${enriched.length} batches expiring within ${days} days`,
+    enriched
+  );
+});
+
+/**
+ * @desc    Get expired batches
+ * @route   GET /api/v1/batches/expired
+ * @access  Public / Private
+ */
+const getExpiredBatches = asyncHandler(async (req, res) => {
+  const now = new Date();
+
+  const batches = await Batch.find({
+    expiryDate: { $lt: now },
+  })
+    .populate('medicineId', 'name genericName brand formula strength type category medicineId minStockAlert')
+    .sort({ expiryDate: 1 });
+
+  const enriched = batches.map(enrichBatch);
+  return ApiResponse.success(res, `Found ${enriched.length} expired batches`, enriched);
+});
+
+/**
+ * @desc    Get single batch details by ID (ObjectId or batchId)
  * @route   GET /api/v1/batches/:id
  * @access  Public / Private
  */
 const getBatchById = asyncHandler(async (req, res) => {
-  const batch = await Batch.findOne({
-    $or: [{ _id: req.params.id }, { batchId: req.params.id }],
-  });
+  const { id } = req.params;
+
+  const isObjectId = mongoose.Types.ObjectId.isValid(id);
+  const query = isObjectId ? { $or: [{ _id: id }, { batchId: id }] } : { batchId: id };
+
+  const batch = await Batch.findOne(query).populate(
+    'medicineId',
+    'name genericName brand formula strength type category medicineId minStockAlert'
+  );
 
   if (!batch) {
     return ApiResponse.error(res, 'Batch not found', ['No batch matches identifier'], 404);
   }
 
-  return ApiResponse.success(res, 'Batch details retrieved', batch);
+  return ApiResponse.success(res, 'Batch details retrieved', enrichBatch(batch));
 });
 
 /**
@@ -137,61 +276,103 @@ const createBatch = asyncHandler(async (req, res) => {
     );
   }
 
-  const medicine = await Medicine.findOne({ medicineId });
-  if (!medicine) {
-    return ApiResponse.error(res, `Parent medicine '${medicineId}' does not exist.`, ['Invalid medicineId'], 404);
+  // Validate date logic
+  const mfg = new Date(manufacturingDate);
+  const exp = new Date(expiryDate);
+  if (isNaN(mfg.getTime()) || isNaN(exp.getTime())) {
+    return ApiResponse.error(
+      res,
+      'Invalid manufacturingDate or expiryDate format.',
+      ['Invalid date values'],
+      400
+    );
+  }
+  if (mfg > exp) {
+    return ApiResponse.error(
+      res,
+      'Validation Error: Manufacturing date cannot be after expiry date.',
+      ['manufacturingDate > expiryDate'],
+      400
+    );
   }
 
-  // Check duplicate batch number for same medicine
-  const existing = await Batch.findOne({ medicineId, batchNumber: batchNumber.trim() });
+  // Resolve parent medicine (accepts ObjectId or string code like MED-1001)
+  const isObjectId = mongoose.Types.ObjectId.isValid(medicineId);
+  const medQuery = isObjectId ? { $or: [{ _id: medicineId }, { medicineId }] } : { medicineId };
+  const medicine = await Medicine.findOne(medQuery);
+
+  if (!medicine) {
+    return ApiResponse.error(
+      res,
+      `Parent medicine '${medicineId}' does not exist.`,
+      ['Invalid medicine reference'],
+      404
+    );
+  }
+
+  // Business Rule: Prevent duplicate batch records within the same medicine
+  const existing = await Batch.findOne({
+    medicineId: medicine._id,
+    batchNumber: batchNumber.trim(),
+  });
   if (existing) {
     return ApiResponse.error(
       res,
-      `Batch number '${batchNumber}' already exists for this medicine.`,
-      ['Duplicate batch number'],
+      `Batch number '${batchNumber}' already exists for medicine '${medicine.name}'.`,
+      ['Duplicate batchNumber for medicine'],
       409
     );
   }
 
+  // Generate unique batchId e.g. BAT-1006
   const count = await Batch.countDocuments();
-  const batchId = req.body.batchId || `BAT-${1001 + count}`;
-  const location = `${rack || 'Rack A-1'}, ${shelf || 'Shelf 1'}`;
+  let batchId = req.body.batchId;
+  if (!batchId) {
+    batchId = `BAT-${1001 + count}`;
+    let exists = await Batch.findOne({ batchId });
+    if (exists) {
+      batchId = `BAT-${1001 + count}-${Date.now().toString().slice(-4)}`;
+    }
+  }
+
+  const pPrice = purchasePrice !== undefined ? Number(purchasePrice) : medicine.purchasePrice;
+  const sPrice = sellingPrice !== undefined ? Number(sellingPrice) : medicine.sellingPrice;
+  const qty = Math.max(0, Number(quantity));
 
   const batch = await Batch.create({
     batchId,
-    medicineId,
+    medicineId: medicine._id,
+    medicineCode: medicine.medicineId,
     batchNumber: batchNumber.trim(),
-    manufacturingDate: new Date(manufacturingDate),
-    expiryDate: new Date(expiryDate),
-    purchasePrice: Number(purchasePrice) || medicine.purchasePrice,
-    sellingPrice: Number(sellingPrice) || medicine.sellingPrice,
-    quantity: Number(quantity),
-    rack: rack || 'Rack A-1',
-    shelf: shelf || 'Shelf 1',
-    location,
-    status: 'In Stock',
-    supplier: supplier || '',
+    manufacturingDate: mfg,
+    expiryDate: exp,
+    purchasePrice: pPrice,
+    sellingPrice: sPrice,
+    quantity: qty,
+    rack: rack?.trim() || medicine.rack || 'Rack A-1',
+    shelf: shelf?.trim() || medicine.shelf || 'Shelf 1',
+    supplier: supplier?.trim() || '',
+    createdBy: req.user?._id || null,
+    updatedBy: req.user?._id || null,
   });
-
-  // Calculate dynamic status
-  batch.status = computeStatus(batch, medicine.minStockAlert);
-  await batch.save();
 
   // Record Stock History log
   await StockHistory.create({
     stockHistoryId: `HIST-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
-    medicineId,
-    batchId,
+    medicineId: medicine.medicineId,
+    batchId: batch.batchId,
     previousQuantity: 0,
-    changedQuantity: Number(quantity),
-    newQuantity: Number(quantity),
+    changedQuantity: qty,
+    newQuantity: qty,
     actionType: 'Add Stock',
-    employeeId: req.user?.employeeId || 'STAFF-01',
+    employeeId: req.user?.username || 'STAFF-01',
     employeeName: req.user?.name || 'Staff Pharmacist',
-    reason: `Initial batch receipt (${batchNumber})`,
+    reason: `Initial batch receipt (${batch.batchNumber})`,
   });
 
-  return ApiResponse.created(res, 'Batch added successfully', batch);
+  await batch.populate('medicineId', 'name genericName brand formula strength type category medicineId minStockAlert');
+
+  return ApiResponse.created(res, `Batch '${batch.batchNumber}' added successfully`, enrichBatch(batch));
 });
 
 /**
@@ -200,9 +381,12 @@ const createBatch = asyncHandler(async (req, res) => {
  * @access  Private ('inventory.edit')
  */
 const updateBatch = asyncHandler(async (req, res) => {
-  const batch = await Batch.findOne({
-    $or: [{ _id: req.params.id }, { batchId: req.params.id }],
-  });
+  const { id } = req.params;
+
+  const isObjectId = mongoose.Types.ObjectId.isValid(id);
+  const query = isObjectId ? { $or: [{ _id: id }, { batchId: id }] } : { batchId: id };
+
+  const batch = await Batch.findOne(query);
 
   if (!batch) {
     return ApiResponse.error(res, 'Batch not found', ['No batch matches identifier'], 404);
@@ -220,20 +404,51 @@ const updateBatch = asyncHandler(async (req, res) => {
     supplier,
   } = req.body;
 
+  // Validate dates if modified
+  const mfg = manufacturingDate ? new Date(manufacturingDate) : batch.manufacturingDate;
+  const exp = expiryDate ? new Date(expiryDate) : batch.expiryDate;
+  if (mfg && exp && mfg > exp) {
+    return ApiResponse.error(
+      res,
+      'Validation Error: Manufacturing date cannot be after expiry date.',
+      ['manufacturingDate > expiryDate'],
+      400
+    );
+  }
+
+  // Validate duplicate batchNumber within the same medicine
+  if (batchNumber && batchNumber.trim() !== batch.batchNumber) {
+    const duplicate = await Batch.findOne({
+      _id: { $ne: batch._id },
+      medicineId: batch.medicineId,
+      batchNumber: batchNumber.trim(),
+    });
+    if (duplicate) {
+      return ApiResponse.error(
+        res,
+        `Batch number '${batchNumber}' already exists for this medicine.`,
+        ['Duplicate batchNumber'],
+        409
+      );
+    }
+    batch.batchNumber = batchNumber.trim();
+  }
+
+  // Handle quantity adjustment & stock history
   if (quantity !== undefined && Number(quantity) !== batch.quantity) {
     const prevQty = batch.quantity;
-    const newQty = Number(quantity);
+    const newQty = Math.max(0, Number(quantity));
     const diff = newQty - prevQty;
 
     await StockHistory.create({
       stockHistoryId: `HIST-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
-      medicineId: batch.medicineId,
+      medicineId: batch.medicineCode || batch.medicineId.toString(),
       batchId: batch.batchId,
       previousQuantity: prevQty,
       changedQuantity: diff,
       newQuantity: newQty,
       actionType: 'Update Stock',
-      employeeId: req.user?.employeeId || 'STAFF-01',
+      employeeId: req.user?.username || 'STAFF-01',
       employeeName: req.user?.name || 'Staff Pharmacist',
       reason: req.body.reason || 'Manual batch quantity correction',
     });
@@ -241,58 +456,88 @@ const updateBatch = asyncHandler(async (req, res) => {
     batch.quantity = newQty;
   }
 
-  if (batchNumber) batch.batchNumber = batchNumber;
-  if (manufacturingDate) batch.manufacturingDate = new Date(manufacturingDate);
-  if (expiryDate) batch.expiryDate = new Date(expiryDate);
-  if (purchasePrice !== undefined) batch.purchasePrice = Number(purchasePrice);
-  if (sellingPrice !== undefined) batch.sellingPrice = Number(sellingPrice);
-  if (rack) batch.rack = rack;
-  if (shelf) batch.shelf = shelf;
-  if (rack || shelf) batch.location = `${batch.rack}, ${batch.shelf}`;
-  if (supplier !== undefined) batch.supplier = supplier;
+  if (manufacturingDate) batch.manufacturingDate = mfg;
+  if (expiryDate) batch.expiryDate = exp;
+  if (purchasePrice !== undefined) batch.purchasePrice = Math.max(0, Number(purchasePrice));
+  if (sellingPrice !== undefined) batch.sellingPrice = Math.max(0, Number(sellingPrice));
+  if (rack !== undefined) batch.rack = rack.trim();
+  if (shelf !== undefined) batch.shelf = shelf.trim();
+  if (supplier !== undefined) batch.supplier = supplier.trim();
 
-  batch.status = computeStatus(batch);
+  batch.updatedBy = req.user?._id || null;
+
   await batch.save();
+  await batch.populate('medicineId', 'name genericName brand formula strength type category medicineId minStockAlert');
 
-  return ApiResponse.success(res, 'Batch updated successfully', batch);
+  return ApiResponse.success(res, `Batch '${batch.batchNumber}' updated successfully`, enrichBatch(batch));
 });
 
 /**
  * @desc    Delete batch
  * @route   DELETE /api/v1/batches/:id
  * @access  Private ('inventory.delete')
+ * @note    Business Rule: Do not delete batches with sales history.
  */
 const deleteBatch = asyncHandler(async (req, res) => {
-  const batch = await Batch.findOne({
-    $or: [{ _id: req.params.id }, { batchId: req.params.id }],
-  });
+  const { id } = req.params;
+
+  const isObjectId = mongoose.Types.ObjectId.isValid(id);
+  const query = isObjectId ? { $or: [{ _id: id }, { batchId: id }] } : { batchId: id };
+
+  const batch = await Batch.findOne(query);
 
   if (!batch) {
     return ApiResponse.error(res, 'Batch not found', ['No batch matches identifier'], 404);
   }
 
+  // Business Rule: Do not delete batches with sales history
+  const hasSalesHistory = await Sale.exists({
+    $or: [
+      { 'items.batchId': batch.batchId },
+      { 'items.batchId': batch._id.toString() },
+      { 'items.batchNumber': batch.batchNumber },
+    ],
+  });
+
+  if (hasSalesHistory) {
+    return ApiResponse.error(
+      res,
+      `Operation Denied: Cannot delete batch '${batch.batchNumber}' because it has recorded sales history. Disposal or stock adjustment must be logged instead to preserve legal pharmacy audit records.`,
+      ['Batch has historical sales references'],
+      400
+    );
+  }
+
+  // Log stock removal if quantity > 0
   if (batch.quantity > 0) {
     await StockHistory.create({
       stockHistoryId: `HIST-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
-      medicineId: batch.medicineId,
+      medicineId: batch.medicineCode || batch.medicineId.toString(),
       batchId: batch.batchId,
       previousQuantity: batch.quantity,
       changedQuantity: -batch.quantity,
       newQuantity: 0,
       actionType: 'Disposal / Waste',
-      employeeId: req.user?.employeeId || 'STAFF-01',
+      employeeId: req.user?.username || 'STAFF-01',
       employeeName: req.user?.name || 'Staff Pharmacist',
-      reason: req.body.reason || 'Batch deleted / discarded',
+      reason: req.body?.reason || 'Batch permanently deleted/discarded',
     });
   }
 
   await batch.deleteOne();
-  return ApiResponse.success(res, 'Batch deleted successfully', {});
+
+  return ApiResponse.success(res, `Batch '${batch.batchNumber}' deleted successfully`, {
+    deleted: true,
+    batchId: batch.batchId,
+    batchNumber: batch.batchNumber,
+  });
 });
 
 module.exports = {
   getBatches,
   getBatchesByMedicine,
+  getNearExpiryBatches,
+  getExpiredBatches,
   getBatchById,
   createBatch,
   updateBatch,

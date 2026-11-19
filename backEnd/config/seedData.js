@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Employee = require('../models/Employee');
 const Permission = require('../models/Permission');
 const Medicine = require('../models/Medicine');
@@ -64,12 +65,15 @@ const seedInitialData = async () => {
         tagline: 'PHARMACY INVENTORY SYSTEM',
         currency: 'Rs',
         currencySymbol: 'Rs.',
+        contactNumber: '+92 300 1234567',
         phone: '+92 300 1234567',
         email: 'info@abubakarmedical.pk',
         address: 'Main Bazar, Medical Market, Pakistan',
         licenseNumber: 'PB-LHR-2026-99042',
-        lowStockThreshold: 15,
-        nearExpiryDays: 60,
+        lowStockThreshold: 10,
+        expiryWarningDays: 90,
+        nearExpiryDays: 90,
+        updatedBy: 'System Default',
       });
       console.log('[Seeder] Store Settings seeded.');
     }
@@ -77,7 +81,7 @@ const seedInitialData = async () => {
     const medCount = await Medicine.countDocuments();
     if (medCount === 0) {
       console.log('[Seeder] Seeding initial medicines catalog & batches...');
-      await Medicine.create([
+      const createdMeds = await Medicine.create([
         {
           medicineId: 'MED-1001',
           name: 'Panadol 500mg',
@@ -94,6 +98,7 @@ const seedInitialData = async () => {
           rack: 'Rack A-1',
           shelf: 'Shelf 2',
           minStockAlert: 30,
+          isActive: true,
         },
         {
           medicineId: 'MED-1002',
@@ -111,6 +116,7 @@ const seedInitialData = async () => {
           rack: 'Rack B-1',
           shelf: 'Shelf 1',
           minStockAlert: 15,
+          isActive: true,
         },
         {
           medicineId: 'MED-1003',
@@ -128,6 +134,7 @@ const seedInitialData = async () => {
           rack: 'Rack A-2',
           shelf: 'Shelf 3',
           minStockAlert: 25,
+          isActive: true,
         },
         {
           medicineId: 'MED-1004',
@@ -145,6 +152,7 @@ const seedInitialData = async () => {
           rack: 'Rack C-1',
           shelf: 'Shelf 2',
           minStockAlert: 20,
+          isActive: true,
         },
         {
           medicineId: 'MED-1005',
@@ -162,13 +170,20 @@ const seedInitialData = async () => {
           rack: 'Rack D-1',
           shelf: 'Shelf 4',
           minStockAlert: 15,
+          isActive: true,
         },
       ]);
+
+      const medMap = {};
+      createdMeds.forEach((m) => {
+        medMap[m.medicineId] = m._id;
+      });
 
       await Batch.create([
         {
           batchId: 'BAT-1001',
-          medicineId: 'MED-1001',
+          medicineId: medMap['MED-1001'],
+          medicineCode: 'MED-1001',
           batchNumber: 'PAN-2026-981',
           manufacturingDate: new Date('2025-01-15'),
           expiryDate: new Date('2028-06-30'),
@@ -183,7 +198,8 @@ const seedInitialData = async () => {
         },
         {
           batchId: 'BAT-1002',
-          medicineId: 'MED-1001',
+          medicineId: medMap['MED-1001'],
+          medicineCode: 'MED-1001',
           batchNumber: 'PAN-2025-412',
           manufacturingDate: new Date('2024-06-10'),
           expiryDate: new Date('2026-12-15'),
@@ -198,7 +214,8 @@ const seedInitialData = async () => {
         },
         {
           batchId: 'BAT-1003',
-          medicineId: 'MED-1002',
+          medicineId: medMap['MED-1002'],
+          medicineCode: 'MED-1002',
           batchNumber: 'AUG-2025-774',
           manufacturingDate: new Date('2025-02-01'),
           expiryDate: new Date('2027-04-30'),
@@ -213,7 +230,8 @@ const seedInitialData = async () => {
         },
         {
           batchId: 'BAT-1004',
-          medicineId: 'MED-1003',
+          medicineId: medMap['MED-1003'],
+          medicineCode: 'MED-1003',
           batchNumber: 'BRU-2026-105',
           manufacturingDate: new Date('2025-03-01'),
           expiryDate: new Date('2027-11-20'),
@@ -228,7 +246,8 @@ const seedInitialData = async () => {
         },
         {
           batchId: 'BAT-1005',
-          medicineId: 'MED-1004',
+          medicineId: medMap['MED-1004'],
+          medicineCode: 'MED-1004',
           batchNumber: 'RIS-2026-302',
           manufacturingDate: new Date('2025-01-20'),
           expiryDate: new Date('2027-08-15'),
@@ -243,6 +262,39 @@ const seedInitialData = async () => {
         },
       ]);
       console.log('[Seeder] Initial medicines and batches seeded.');
+    } else {
+      // Ensure all medicines have isActive set to true if undefined
+      await Medicine.updateMany({ isActive: { $exists: false } }, { $set: { isActive: true } });
+
+      // Direct native migration of legacy batch records to store Medicine ObjectId references
+      const db = mongoose.connection.db;
+      if (db) {
+        const rawBatches = await db.collection('batches').find().toArray();
+        for (const b of rawBatches) {
+          if (typeof b.medicineId === 'string' && !mongoose.Types.ObjectId.isValid(b.medicineId)) {
+            const med = await Medicine.findOne({ medicineId: b.medicineId });
+            if (med) {
+              await db.collection('batches').updateOne(
+                { _id: b._id },
+                {
+                  $set: {
+                    medicineId: med._id,
+                    medicineCode: med.medicineId,
+                  },
+                }
+              );
+            }
+          } else if (b.medicineId && !b.medicineCode) {
+            const med = await Medicine.findById(b.medicineId);
+            if (med) {
+              await db.collection('batches').updateOne(
+                { _id: b._id },
+                { $set: { medicineCode: med.medicineId } }
+              );
+            }
+          }
+        }
+      }
     }
   } catch (err) {
     console.error('[Seeder] Error in seedInitialData:', err.message);

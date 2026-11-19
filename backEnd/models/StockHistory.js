@@ -1,5 +1,20 @@
 const mongoose = require('mongoose');
 
+const ACTION_TYPES = [
+  'ADD',
+  'UPDATE',
+  'REMOVE',
+  'SALE',
+  'RETURN',
+  // Backwards compatibility mappings
+  'Add Stock',
+  'Update Stock',
+  'Remove Stock',
+  'Sale Deduction',
+  'Disposal / Waste',
+  'Supplier Return',
+];
+
 const stockHistorySchema = new mongoose.Schema(
   {
     stockHistoryId: {
@@ -15,6 +30,7 @@ const stockHistorySchema = new mongoose.Schema(
     },
     batchId: {
       type: String,
+      required: true,
       index: true,
     },
     previousQuantity: {
@@ -31,20 +47,14 @@ const stockHistorySchema = new mongoose.Schema(
     },
     actionType: {
       type: String,
-      enum: [
-        'Add Stock',
-        'Update Stock',
-        'Remove Stock',
-        'Sale Deduction',
-        'Disposal / Waste',
-        'Supplier Return',
-      ],
       required: true,
+      enum: ACTION_TYPES,
       index: true,
     },
     employeeId: {
       type: String,
       default: 'STAFF-01',
+      index: true,
     },
     employeeName: {
       type: String,
@@ -53,11 +63,16 @@ const stockHistorySchema = new mongoose.Schema(
     reason: {
       type: String,
       trim: true,
+      default: '',
+    },
+    dateTime: {
+      type: Date,
+      default: Date.now,
+      index: true,
     },
     timestamp: {
       type: Date,
       default: Date.now,
-      index: true,
     },
   },
   {
@@ -65,4 +80,15 @@ const stockHistorySchema = new mongoose.Schema(
   }
 );
 
+// Pre-save hook to keep dateTime and timestamp synced
+stockHistorySchema.pre('save', function () {
+  if (!this.dateTime) {
+    this.dateTime = this.timestamp || new Date();
+  }
+  if (!this.timestamp) {
+    this.timestamp = this.dateTime || new Date();
+  }
+});
+
 module.exports = mongoose.model('StockHistory', stockHistorySchema);
+module.exports.ACTION_TYPES = ACTION_TYPES;
