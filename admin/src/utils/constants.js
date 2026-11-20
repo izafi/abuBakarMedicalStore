@@ -16,14 +16,14 @@ export const APP_INFO = {
 };
 
 export const STORAGE_KEYS = {
-  MEDICINES: 'abm_medicines_registry_v2',
-  BATCHES: 'abm_medicine_batches_v2',
-  STOCK_HISTORY: 'abm_stock_history_v2',
-  SALES: 'abm_sales_invoices_v2',
-  EMPLOYEES: 'abm_employees_registry_v2',
-  AUTH_USER: 'abm_auth_session_v2',
-  CATEGORIES: 'abm_categories_v2',
-  SETTINGS: 'abm_store_settings_v2',
+  MEDICINES: 'abm_medicines_v3',
+  BATCHES: 'abm_batches_v3',
+  STOCK_HISTORY: 'abm_stock_history_v3',
+  SALES: 'abm_sales_v3',
+  EMPLOYEES: 'abm_employees_v3',
+  AUTH_USER: 'abm_auth_session_v3',
+  CATEGORIES: 'abm_categories_v3',
+  SETTINGS: 'abm_store_settings_v3',
 };
 
 export const USER_ROLES = {

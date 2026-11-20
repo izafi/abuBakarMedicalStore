@@ -5,11 +5,13 @@ import {
   MapPin,
   Clock,
   Plus,
+  Search,
+  ShoppingCart,
+  UserCheck,
+  X,
+  CheckCircle2,
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
-import { Button } from '../components/common/Button';
-import { SearchBar } from '../components/common/SearchBar';
-import { Badge } from '../components/common/Badge';
 import { InvoiceModal } from '../components/common/InvoiceModal';
 import { SalesCart } from '../components/pos/SalesCart';
 import { CheckoutModal } from '../components/pos/CheckoutModal';
@@ -18,6 +20,7 @@ import { useSales } from '../hooks/useSales';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { formatCurrency, formatDate } from '../utils/formatters';
+
 
 export const POS = () => {
   const { medicines, batches } = useInventory();
@@ -46,12 +49,15 @@ export const POS = () => {
   const [isCheckoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [lastInvoice, setLastInvoice] = useState(null);
 
-  // Filter medicines that have valid sellable stock
+  // Filter medicines ONLY when search query is entered (medicines hidden by default)
   const availableMedicines = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) {
+      return []; // Hidden until searched
+    }
+
     return medicines.filter((med) => {
-      const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
-        !q ||
         med.name.toLowerCase().includes(q) ||
         med.genericName.toLowerCase().includes(q) ||
         med.brand?.toLowerCase().includes(q) ||
@@ -71,7 +77,7 @@ export const POS = () => {
     }
     try {
       addToCart(med, 1, batch);
-      toast.showSuccess(`Added ${med.name} to active cart`);
+      toast.showSuccess(`Added ${med.name} to bill`);
     } catch (err) {
       toast.showError(err.message);
     }
@@ -90,131 +96,245 @@ export const POS = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Page Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4">
+      {/* Page Title & Status Header (NO STATS CARDS) */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-black tracking-tight flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
+              <ShoppingCart className="w-4 h-4 text-[#1C9A58]" />
+            </div>
             Point of Sale (POS) Billing
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-xs sm:text-sm text-black font-semibold mt-0.5">
             Counter dispensing, multiple batches selection, discounts, and instant receipt printing.
           </p>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Medicine Catalog (7 Cols) */}
-        <div className="lg:col-span-7 space-y-4">
-          <Card>
-            <SearchBar
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by brand name, generic formula, strength, or batch..."
-            />
-          </Card>
-
-          {/* Medicines Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[620px] overflow-y-auto pr-1">
-            {availableMedicines.length === 0 ? (
-              <div className="sm:col-span-2 py-16 text-center text-gray-400 bg-white rounded-2xl border border-gray-100 p-6">
-                <PackageSearch className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                <p className="font-semibold text-gray-700">No sellable medicines found</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Try adjusting your search or add incoming stock in the Inventory module.
-                </p>
-              </div>
-            ) : (
-              availableMedicines.map((med) => {
-                const medBatches = batches.filter(
-                  (b) => b.medicineId === med.medicineId && b.canSell && b.quantity > 0
-                );
-
-                return (
-                  <div
-                    key={med.id}
-                    className="p-4 bg-white rounded-xl border border-gray-100 hover:border-[#1C9A58] hover:shadow-xs transition-all flex flex-col justify-between space-y-3"
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h4 className="font-bold text-gray-900 text-sm leading-snug">
-                            {med.name}
-                          </h4>
-                          <p className="text-xs text-gray-500 mt-0.5 font-medium">
-                            {med.genericName} ({med.strength})
-                          </p>
-                        </div>
-                        <span className="font-black text-sm text-[#1C9A58] shrink-0">
-                          {formatCurrency(med.sellingPrice)}
-                        </span>
-                      </div>
-
-                      <div className="mt-2.5 pt-2 border-t border-gray-100 space-y-1 text-xs text-gray-500">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-emerald-600" />
-                            <span>{med.location}</span>
-                          </span>
-                          <span className="font-mono text-gray-400">
-                            {med.batchNo}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-gray-400" />
-                            Exp: {formatDate(med.expiryDate)}
-                          </span>
-                          <Badge variant="success" size="sm">
-                            {med.availableStock} in stock
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Batch selection chips if multiple batches exist */}
-                    {medBatches.length > 1 ? (
-                      <div className="pt-2 border-t border-gray-100 space-y-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1">
-                          <Layers className="w-3 h-3 text-gray-400" />
-                          Choose Batch:
-                        </span>
-                        <div className="flex flex-wrap gap-1">
-                          {medBatches.map((b) => (
-                            <button
-                              key={b.batchId || b.id}
-                              type="button"
-                              onClick={() => handleAddToCart(med, b)}
-                              className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-gray-50 hover:bg-emerald-50 hover:text-[#0F3A2C] border border-gray-200 transition-colors"
-                              title={`Add from batch ${b.batchNumber} (${b.quantity} units, exp: ${b.expiryDate})`}
-                            >
-                              +{b.batchNumber} ({b.quantity})
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        fullWidth
-                        iconLeft={Plus}
-                        onClick={() => handleAddToCart(med)}
-                        className="text-xs"
-                      >
-                        Add to Bill
-                      </Button>
-                    )}
-                  </div>
-                );
-              })
-            )}
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-950 shadow-xs">
+            <UserCheck className="w-3.5 h-3.5 text-[#1C9A58]" />
+            <span>Cashier: {currentUser?.name || 'Ayesha Khan'}</span>
           </div>
         </div>
+      </div>
 
-        {/* Right Column: Reusable SalesCart Component (5 Cols) */}
-        <div className="lg:col-span-5">
+      {/* Main Grid: Left Side (5 cols) & Active Sales Cart (7 cols - Spacious & Wider) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        {/* Left Column: Search & Dynamic Medicine Details (5 Cols) */}
+        <div className="lg:col-span-5 space-y-3">
+          {/* Main POS Search Bar Card */}
+          <Card className="p-3.5 space-y-2.5">
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Type medicine name, formula, or batch..."
+                className="w-full h-11 pl-10 pr-10 text-xs sm:text-sm font-bold border border-slate-300 rounded-xl bg-slate-50 hover:bg-white focus:bg-white text-black shadow-xs focus:outline-none focus:border-[#1C9A58] focus:ring-2 focus:ring-[#1C9A58]/20 transition-all placeholder:text-slate-400 placeholder:font-normal"
+                autoFocus
+              />
+              <Search className="w-4 h-4 text-black absolute left-3.5 top-3.5 pointer-events-none" />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="w-6 h-6 rounded-full hover:bg-slate-200 text-slate-500 hover:text-black absolute right-3 top-2.5 flex items-center justify-center cursor-pointer transition-colors"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Medicine Preset Chips for 1-Click Search (Dynamic from real catalog) */}
+            {medicines.length > 0 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-black whitespace-nowrap mr-0.5">
+                  QUICK:
+                </span>
+                {medicines.slice(0, 8).map((m) => (
+                  <button
+                    key={m.medicineId || m.id || m.name}
+                    type="button"
+                    onClick={() => setSearchQuery(m.name)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                      searchQuery.toLowerCase() === m.name.toLowerCase()
+                        ? 'bg-[#1C9A58] text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-black border border-slate-200'
+                    }`}
+                  >
+                    {m.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* DYNAMIC RESULTS DISPLAY */}
+          {searchQuery.trim() === '' ? (
+            <div className="bg-white rounded-xl border border-slate-200/90 p-8 text-center shadow-xs space-y-4">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto text-[#1C9A58] shadow-xs">
+                <PackageSearch className="w-7 h-7" />
+              </div>
+              <div className="max-w-xs mx-auto space-y-1.5">
+                <h3 className="text-base font-bold text-black">
+                  Search Medicine to Dispense
+                </h3>
+                <p className="text-xs text-slate-600 font-semibold leading-relaxed">
+                  Type medicine brand name, active generic formula, strength, or batch number above to look up stock and add to the bill.
+                </p>
+              </div>
+
+              {/* Quick Feature Badges */}
+              <div className="flex flex-col gap-2 pt-1 text-left max-w-xs mx-auto">
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold text-black">
+                  <CheckCircle2 className="w-4 h-4 text-[#1C9A58] shrink-0" />
+                  <span>Real-time Available Stock Verification</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold text-black">
+                  <Layers className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>Multi-Batch Selection & Switching</span>
+                </div>
+                <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold text-black">
+                  <Clock className="w-4 h-4 text-purple-600 shrink-0" />
+                  <span>FIFO Expiry Safeguard Alerts</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Search result summary header */}
+              <div className="flex items-center justify-between px-1 text-xs">
+                <span className="font-bold text-black">
+                  Found <span className="text-[#1C9A58] font-mono font-extrabold">{availableMedicines.length}</span> result{availableMedicines.length === 1 ? '' : 's'} for "{searchQuery}"
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="text-slate-500 hover:text-black font-semibold text-xs cursor-pointer"
+                >
+                  Clear Results
+                </button>
+              </div>
+
+              {/* Matching Medicines List (Single Column Spacious Cards) */}
+              {availableMedicines.length === 0 ? (
+                <div className="py-12 text-center bg-white rounded-xl border border-slate-200 p-6 shadow-xs space-y-2">
+                  <PackageSearch className="w-10 h-10 text-slate-400 mx-auto" />
+                  <p className="font-bold text-black text-sm">
+                    No active medicines found matching "{searchQuery}"
+                  </p>
+                  <p className="text-xs text-slate-500 font-semibold max-w-xs mx-auto">
+                    Check spelling or verify stock in the Inventory module.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="px-3.5 py-1.5 text-xs font-bold text-black bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg cursor-pointer"
+                    >
+                      Clear Search
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-[640px] overflow-y-auto no-scrollbar pr-0.5">
+                  {availableMedicines.map((med) => {
+                    const medBatches = batches.filter(
+                      (b) => b.medicineId === med.medicineId && b.canSell && b.quantity > 0
+                    );
+
+                    return (
+                      <div
+                        key={med.id}
+                        className="p-3.5 bg-white rounded-xl border border-slate-200 hover:border-[#1C9A58] hover:shadow-md transition-all space-y-2.5"
+                      >
+                        {/* Header: Name, Strength, Formula, and Price */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h4 className="font-bold text-black text-sm leading-snug">
+                                {med.name}
+                              </h4>
+                              <span className="text-[10px] font-bold text-slate-800 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-md">
+                                {med.strength}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 font-semibold mt-0.5">
+                              {med.genericName}
+                            </p>
+                          </div>
+                          <span className="font-bold font-mono text-base text-[#1C9A58] shrink-0">
+                            {formatCurrency(med.sellingPrice)}
+                          </span>
+                        </div>
+
+                        {/* Location, Batch, Expiry, and Stock */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1 border-t border-slate-100">
+                          <div className="flex items-center gap-2 text-black font-semibold text-[11px]">
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3.5 h-3.5 text-[#1C9A58]" />
+                              <span>{med.location}</span>
+                            </span>
+                            <span className="text-slate-400">&bull;</span>
+                            <span className="font-mono font-bold text-black">
+                              {med.batchNo}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-slate-600 font-medium">
+                              Exp: {formatDate(med.expiryDate)}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-300">
+                              {med.availableStock} in stock
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Batch selection chips or prominent Add to Bill Button */}
+                        {medBatches.length > 1 ? (
+                          <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-black flex items-center gap-1">
+                              <Layers className="w-3.5 h-3.5 text-[#1C9A58]" />
+                              Choose Batch:
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {medBatches.map((b) => (
+                                <button
+                                  key={b.batchId || b.id}
+                                  type="button"
+                                  onClick={() => handleAddToCart(med, b)}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-50 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-300 transition-colors cursor-pointer shadow-xs"
+                                  title={`Add from batch ${b.batchNumber} (${b.quantity} units, exp: ${b.expiryDate})`}
+                                >
+                                  +{b.batchNumber} ({b.quantity})
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(med)}
+                            className="w-full py-2 px-3 rounded-xl font-bold text-xs text-white bg-[#1C9A58] hover:bg-[#0F3A2C] transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            Add to Bill
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Reusable SalesCart Component (7 Cols - Spacious & Beautiful) */}
+        <div className="lg:col-span-7">
           <SalesCart
             cart={cart}
             availableBatches={batches}
@@ -231,7 +351,7 @@ export const POS = () => {
             onRemoveItem={removeFromCart}
             onClearCart={clearCart}
             onCheckout={handleCheckout}
-            cashierName={currentUser?.name || 'Staff Pharmacist'}
+            cashierName={currentUser?.name || 'Ayesha Khan'}
             canAddSale={canAddSale}
           />
         </div>

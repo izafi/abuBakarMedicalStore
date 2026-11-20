@@ -4,7 +4,6 @@ import {
   Menu,
   Bell,
   ShoppingCart,
-  RotateCcw,
   AlertTriangle,
   CheckCircle2,
   ExternalLink,
@@ -14,14 +13,16 @@ import {
   Shield,
   PanelLeftClose,
   PanelLeftOpen,
+  Users,
+  Settings,
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
-import { ConfirmDialog } from '../common/ConfirmDialog';
 import { useInventory } from '../../hooks/useInventory';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { USER_ROLES } from '../../utils/constants';
+import { alert } from '../../utils/sweetAlert';
 
 export const Header = ({
   onOpenMobileMenu,
@@ -30,22 +31,17 @@ export const Header = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { analytics, resetToDemoData } = useInventory();
+  const { analytics } = useInventory();
   const { currentUser, users, switchUser, logout } = useAuth();
   const toast = useToast();
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const totalAlerts =
-    analytics.lowStockCount + analytics.expiringSoonCount + analytics.expiredCount;
-
-  const handleResetData = () => {
-    resetToDemoData();
-    setShowResetConfirm(false);
-    toast.showSuccess('Sample data restored successfully to localStorage');
-  };
+    (analytics?.lowStockCount || 0) +
+    (analytics?.expiringSoonCount || 0) +
+    (analytics?.expiredCount || 0);
 
   const getRoleBadgeVariant = (role) => {
     if (role === USER_ROLES.ADMIN) return 'primary';
@@ -118,7 +114,7 @@ export const Header = ({
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#1C9A58] animate-pulse" />
                 <span className="text-[11px] text-gray-500 font-medium">
-                  Pharmacy System • Offline Ready
+                  Pharmacy System • Live API Connected
                 </span>
               </div>
             </div>
@@ -138,18 +134,6 @@ export const Header = ({
                 POS Bill
               </Button>
             )}
-
-            {/* Database Reset Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              iconLeft={RotateCcw}
-              onClick={() => setShowResetConfirm(true)}
-              className="hidden xl:inline-flex text-xs text-gray-500 hover:text-gray-900"
-              title="Reset medicines & sales to demo state"
-            >
-              Reset Data
-            </Button>
 
             {/* Notification Bell Dropdown */}
             <div className="relative">
@@ -317,61 +301,54 @@ export const Header = ({
                       </div>
                     </div>
 
-                    {/* Quick Demo Switcher Section */}
-                    <div className="py-3 border-b border-gray-100">
-                      <div className="flex items-center justify-between pb-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                          Switch Demo Account
-                        </span>
-                        <Shield className="w-3.5 h-3.5 text-[#1C9A58]" />
-                      </div>
-                      <div className="space-y-1">
-                        {users.map((u) => {
-                          const isSelected = currentUser?.id === u.id;
-                          return (
-                            <button
-                              key={u.id}
-                              type="button"
-                              onClick={() => {
-                                switchUser(u.id);
-                                setShowUserDropdown(false);
-                                toast.showSuccess(`Switched active user to ${u.name}`);
-                              }}
-                              className={`
-                                w-full p-2 rounded-lg text-left text-xs flex items-center justify-between transition-colors cursor-pointer
-                                ${
-                                  isSelected
-                                    ? 'bg-emerald-50 text-[#1C9A58] font-bold border border-emerald-100'
-                                    : 'text-gray-700 hover:bg-gray-50'
-                                }
-                              `}
-                            >
-                              <div className="flex items-center gap-2 truncate">
-                                <UserCheck className={`w-3.5 h-3.5 ${isSelected ? 'text-[#1C9A58]' : 'text-gray-400'}`} />
-                                <span className="truncate">{u.name}</span>
-                              </div>
-                              <span className="text-[10px] text-gray-400 font-semibold shrink-0">
-                                {u.role}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Logout Option */}
-                    <div className="pt-2">
+                    {/* Quick Navigation Shortcuts */}
+                    <div className="py-2.5 border-b border-gray-100 space-y-1">
                       <button
                         type="button"
                         onClick={() => {
-                          logout();
+                          navigate('/employees');
                           setShowUserDropdown(false);
-                          toast.showInfo('Counter session locked. Please sign in to resume.');
                         }}
-                        className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        className="w-full p-2 rounded-lg text-left text-xs font-bold text-gray-700 hover:bg-emerald-50 hover:text-[#1C9A58] flex items-center gap-2 transition-colors cursor-pointer"
+                      >
+                        <Users className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Staff & Roles Management</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigate('/settings');
+                          setShowUserDropdown(false);
+                        }}
+                        className="w-full p-2 rounded-lg text-left text-xs font-bold text-gray-700 hover:bg-emerald-50 hover:text-[#1C9A58] flex items-center gap-2 transition-colors cursor-pointer"
+                      >
+                        <Settings className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Pharmacy System Settings</span>
+                      </button>
+                    </div>
+
+                    {/* Logout Option with SweetAlert */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setShowUserDropdown(false);
+                          const confirmed = await alert.confirm({
+                            title: 'Sign Out Session?',
+                            text: 'Are you sure you want to lock this station and sign out?',
+                            confirmButtonText: 'Yes, Sign Out',
+                            cancelButtonText: 'Cancel',
+                            isDanger: true,
+                          });
+                          if (confirmed) {
+                            await logout();
+                            alert.toast('Station locked. Please sign in to resume.', 'info');
+                          }
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                       >
                         <LogOut className="w-4 h-4" />
-                        <span>Lock Station / Logout</span>
+                        <span>Sign Out / Lock Station</span>
                       </button>
                     </div>
                   </div>
@@ -381,17 +358,6 @@ export const Header = ({
           </div>
         </div>
       </header>
-
-      {/* Reset Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={showResetConfirm}
-        onClose={() => setShowResetConfirm(false)}
-        onConfirm={handleResetData}
-        title="Reset Demo Data"
-        message="This will restore all demo medicines and sales invoices back to their clean initial state. Proceed?"
-        confirmText="Confirm Reset"
-        variant="warning"
-      />
     </>
   );
 };

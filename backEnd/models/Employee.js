@@ -4,6 +4,11 @@ const jwt = require('jsonwebtoken');
 
 const employeeSchema = new mongoose.Schema(
   {
+    employeeId: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     name: {
       type: String,
       required: [true, 'Employee name is required'],
@@ -24,6 +29,11 @@ const employeeSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
       index: true,
+    },
+    phone: {
+      type: String,
+      trim: true,
+      default: '',
     },
     password: {
       type: String,

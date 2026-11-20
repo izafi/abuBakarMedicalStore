@@ -1,46 +1,39 @@
 /**
- * Safe localStorage Utilities
+ * Storage Utilities (Deprecated - Abu Bakar Medical Store is 100% Dynamic API & Database Driven)
+ * This utility clears any obsolete local storage data and prevents business data caching.
  */
 
+if (typeof window !== 'undefined' && window.localStorage) {
+  try {
+    const keysToRemove = [
+      'abm_medicines_v3',
+      'abm_batches_v3',
+      'abm_stock_history_v3',
+      'abm_sales_v3',
+      'abm_employees_v3',
+      'abm_auth_session_v3',
+      'abm_categories_v3',
+      'abm_store_settings_v3',
+      'abm_medicines_registry_v2',
+      'abm_medicine_batches_v2',
+      'abm_stock_history_v2',
+      'abm_sales_invoices_v2',
+      'abm_employees_registry_v2',
+      'abm_auth_session_v2',
+      'abm_categories_v2',
+      'abm_store_settings_v2',
+    ];
+    keysToRemove.forEach((k) => window.localStorage.removeItem(k));
+  } catch {
+    // Ignore storage clear errors
+  }
+}
+
 export const storage = {
-  get: (key, defaultValue = null) => {
-    try {
-      const item = window.localStorage.getItem(key);
-      if (item === null || item === undefined) return defaultValue;
-      return JSON.parse(item);
-    } catch (error) {
-      console.error(`Error reading key "${key}" from localStorage:`, error);
-      return defaultValue;
-    }
-  },
-
-  set: (key, value) => {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(value));
-      return true;
-    } catch (error) {
-      console.error(`Error writing key "${key}" to localStorage:`, error);
-      return false;
-    }
-  },
-
-  remove: (key) => {
-    try {
-      window.localStorage.removeItem(key);
-      return true;
-    } catch (error) {
-      console.error(`Error removing key "${key}" from localStorage:`, error);
-      return false;
-    }
-  },
-
-  clear: () => {
-    try {
-      window.localStorage.clear();
-      return true;
-    } catch (error) {
-      console.error('Error clearing localStorage:', error);
-      return false;
-    }
-  },
+  get: () => null,
+  set: () => false,
+  remove: () => true,
+  clear: () => true,
 };
+
+export default storage;

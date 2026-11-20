@@ -30,15 +30,15 @@ export const QuantityControl = ({
   };
 
   return (
-    <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg p-0.5">
+    <div className="flex items-center gap-1 bg-slate-100 border border-slate-300 rounded-lg p-0.5 shadow-xs">
       <button
         type="button"
         disabled={disabled || quantity <= 1}
         onClick={handleDecrement}
-        className="w-6 h-6 rounded flex items-center justify-center text-gray-600 hover:bg-white hover:text-gray-900 disabled:opacity-40 transition-colors"
+        className="w-6 h-6 rounded flex items-center justify-center text-black hover:bg-white hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
         title="Decrease quantity"
       >
-        <Minus className="w-3 h-3" />
+        <Minus className="w-3 h-3 stroke-[2.5]" />
       </button>
 
       <input
@@ -48,17 +48,17 @@ export const QuantityControl = ({
         disabled={disabled}
         value={quantity}
         onChange={handleManualChange}
-        className="w-10 text-center text-xs font-bold bg-transparent text-gray-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+        className="w-9 text-center text-xs font-bold font-mono bg-transparent text-black focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
       />
 
       <button
         type="button"
         disabled={disabled || quantity >= maxStock}
         onClick={handleIncrement}
-        className="w-6 h-6 rounded flex items-center justify-center text-gray-600 hover:bg-white hover:text-gray-900 disabled:opacity-40 transition-colors"
+        className="w-6 h-6 rounded flex items-center justify-center text-black hover:bg-white hover:text-black disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
         title="Increase quantity"
       >
-        <Plus className="w-3 h-3" />
+        <Plus className="w-3 h-3 stroke-[2.5]" />
       </button>
     </div>
   );

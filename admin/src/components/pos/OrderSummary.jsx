@@ -9,46 +9,45 @@ export const OrderSummary = ({
   cashierName = 'Staff Pharmacist',
 }) => {
   return (
-    <div className="space-y-3 pt-3 border-t border-gray-100">
-      <div className="space-y-1.5 text-xs text-gray-600">
-        <div className="flex justify-between">
+    <div className="space-y-3 pt-3 border-t border-slate-200">
+      <div className="space-y-1.5 text-xs text-black">
+        <div className="flex justify-between font-bold">
           <span>Subtotal ({orderSummary.totalItems} items):</span>
-          <span className="font-semibold text-gray-800">
+          <span className="font-mono text-black">
             {formatCurrency(orderSummary.subtotal)}
           </span>
         </div>
 
         {orderSummary.discountAmount > 0 && (
-          <div className="flex justify-between text-emerald-600 font-medium">
+          <div className="flex justify-between text-emerald-800 font-bold">
             <span>Total Discount Savings:</span>
-            <span>-{formatCurrency(orderSummary.discountAmount)}</span>
+            <span className="font-mono">-{formatCurrency(orderSummary.discountAmount)}</span>
           </div>
         )}
 
-        <div className="flex justify-between text-base font-extrabold text-gray-900 pt-2 border-t border-gray-100">
+        <div className="flex justify-between items-center text-sm font-bold text-black pt-2 border-t border-slate-200">
           <span>Final Amount:</span>
-          <span className="text-[#1C9A58]">
+          <span className="text-xl font-bold font-mono text-[#0F3A2C]">
             {formatCurrency(orderSummary.grandTotal)}
           </span>
         </div>
       </div>
 
       <div className="pt-1">
-        <Button
-          variant="primary"
-          size="lg"
-          fullWidth
+        <button
+          type="button"
           disabled={disabled || orderSummary.totalItems === 0}
           onClick={onCheckout}
-          iconLeft={CheckCircle2}
+          className="w-full py-2.5 px-4 rounded-xl font-bold text-sm text-white bg-[#1C9A58] hover:bg-[#0F3A2C] disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
         >
+          <CheckCircle2 className="w-4 h-4 text-white" />
           Complete Sale & Print Receipt
-        </Button>
+        </button>
       </div>
 
-      <div className="flex items-center justify-center gap-1.5 text-[10px] text-gray-400">
-        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-        <span>Verified by {cashierName} • Stock deducted upon checkout</span>
+      <div className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-black">
+        <ShieldCheck className="w-3.5 h-3.5 text-[#1C9A58]" />
+        <span>Verified by {cashierName} &bull; Stock deducted upon checkout</span>
       </div>
     </div>
   );

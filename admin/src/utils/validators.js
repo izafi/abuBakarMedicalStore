@@ -74,6 +74,10 @@ export const validateEmployee = (data, existingEmployees = [], editingEmployeeId
 
   if (!data.name || !data.name.trim()) {
     errors.name = 'Employee full name is required';
+  } else if (/\d/.test(data.name)) {
+    errors.name = 'Full name cannot contain numbers. Only alphabetic characters are allowed.';
+  } else if (!/^[a-zA-Z\s]+$/.test(data.name.trim())) {
+    errors.name = 'Full name must contain alphabets only';
   }
 
   if (!data.username || !data.username.trim()) {
@@ -90,11 +94,23 @@ export const validateEmployee = (data, existingEmployees = [], editingEmployeeId
   }
 
   if (!editingEmployeeId && (!data.password || data.password.length < 4)) {
-    errors.password = 'Demo password must be at least 4 characters';
+    errors.password = 'Password must be at least 4 characters';
   }
 
   if (!data.role || ![USER_ROLES.ADMIN, USER_ROLES.EMPLOYEE].includes(data.role)) {
     errors.role = 'Role must be Admin or Employee';
+  }
+
+  // Phone Contact Validation: exactly 13 characters, must start with +92
+  const phone = data.phone ? String(data.phone).trim() : '';
+  if (!phone) {
+    errors.phone = 'Phone contact is required';
+  } else if (!phone.startsWith('+92')) {
+    errors.phone = 'Phone number must start with "+92" (e.g. +923001234567)';
+  } else if (phone.length !== 13) {
+    errors.phone = `Phone number must be exactly 13 characters (currently ${phone.length})`;
+  } else if (!/^\+92\d{10}$/.test(phone)) {
+    errors.phone = 'Phone number must start with +92 followed by 10 digits';
   }
 
   return {

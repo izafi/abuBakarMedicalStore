@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { ToastContext } from './contexts';
+import { alert } from '../utils/sweetAlert';
 
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
@@ -23,18 +24,22 @@ export const ToastProvider = ({ children }) => {
   }, [removeToast]);
 
   const showSuccess = useCallback((message, duration) => {
+    alert.toast(message, 'success');
     return addToast({ message, type: 'success', duration });
   }, [addToast]);
 
   const showError = useCallback((message, duration) => {
+    alert.toast(message, 'error');
     return addToast({ message, type: 'error', duration });
   }, [addToast]);
 
   const showWarning = useCallback((message, duration) => {
+    alert.toast(message, 'warning');
     return addToast({ message, type: 'warning', duration });
   }, [addToast]);
 
   const showInfo = useCallback((message, duration) => {
+    alert.toast(message, 'info');
     return addToast({ message, type: 'info', duration });
   }, [addToast]);
 

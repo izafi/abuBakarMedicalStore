@@ -33,11 +33,16 @@ const sendAuthResponse = async (employee, statusCode, res, message = 'Authentica
     };
   });
 
+  const displayEmployeeId = employee.employeeId || `EMP-${String(employee._id).slice(-4).toUpperCase()}`;
+
   const userProfile = {
+    _id: employee._id,
     id: employee._id,
+    employeeId: displayEmployeeId,
     name: employee.name,
     username: employee.username,
     email: employee.email,
+    phone: employee.phone || '',
     role: employee.role,
     status: employee.status,
     createdAt: employee.createdAt,
@@ -201,11 +206,16 @@ const getMe = asyncHandler(async (req, res) => {
     };
   });
 
+  const displayEmployeeId = employee.employeeId || `EMP-${String(employee._id).slice(-4).toUpperCase()}`;
+
   const userProfile = {
+    _id: employee._id,
     id: employee._id,
+    employeeId: displayEmployeeId,
     name: employee.name,
     username: employee.username,
     email: employee.email,
+    phone: employee.phone || '',
     role: employee.role,
     status: employee.status,
     createdAt: employee.createdAt,
@@ -297,16 +307,74 @@ const changePassword = asyncHandler(async (req, res) => {
 });
 
 /**
+ * @desc    Forgot / Reset Password
+ * @route   POST /api/v1/auth/forgot-password
+ * @access  Public
+ */
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { email, username, newPassword } = req.body;
+  const lookup = (email || username || '').toLowerCase().trim();
+
+  if (!lookup) {
+    return ApiResponse.error(res, 'Please provide your registered email or username.', ['Missing identifier'], 400);
+  }
+
+  const employee = await Employee.findOne({
+    $or: [{ email: lookup }, { username: lookup }],
+  }).select('+password');
+
+  if (!employee) {
+    return ApiResponse.error(res, 'No account found with this email or username.', ['User not found'], 404);
+  }
+
+  if (employee.status !== 'Active') {
+    return ApiResponse.error(res, 'This account is deactivated. Please contact your administrator.', ['Account inactive'], 403);
+  }
+
+  if (!newPassword) {
+    return ApiResponse.success(res, `Account verified for ${employee.name}. Please enter your new password to proceed.`, {
+      verified: true,
+      email: employee.email,
+      name: employee.name,
+    });
+  }
+
+  if (newPassword.length < 4) {
+    return ApiResponse.error(res, 'New password must be at least 4 characters long.', ['Password too short'], 400);
+  }
+
+  employee.password = newPassword;
+  await employee.save();
+
+  return ApiResponse.success(res, `Password reset successfully for ${employee.name}. You can now sign in with your new password.`, {
+    reset: true,
+  });
+});
+
+/**
  * @desc    Get Demo Accounts list for account switcher
  * @route   GET /api/v1/auth/demo-accounts
  * @access  Public
  */
 const getDemoAccounts = asyncHandler(async (req, res) => {
   const employees = await Employee.find({ status: 'Active' })
-    .select('name username email role status createdAt')
+    .select('name username email phone employeeId role status createdAt')
     .sort({ role: 1 });
 
-  return ApiResponse.success(res, 'Demo accounts retrieved', employees);
+  const formatted = employees.map((emp) => ({
+    _id: emp._id,
+    id: emp._id,
+    employeeId: emp.employeeId || `EMP-${String(emp._id).slice(-4).toUpperCase()}`,
+    name: emp.name,
+    username: emp.username,
+    email: emp.email,
+    phone: emp.phone || '',
+    role: emp.role,
+    status: emp.status,
+    createdAt: emp.createdAt,
+  }));
+
+  return ApiResponse.success(res, 'Demo accounts retrieved', formatted);
 });
 
 module.exports = {
@@ -316,5 +384,6 @@ module.exports = {
   getMe,
   verifyPassword,
   changePassword,
+  forgotPassword,
   getDemoAccounts,
 };

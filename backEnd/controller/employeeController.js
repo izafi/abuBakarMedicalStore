@@ -27,12 +27,16 @@ const getEmployees = asyncHandler(async (req, res) => {
       };
     });
 
+    const displayEmployeeId = emp.employeeId || `EMP-${String(emp._id).slice(-4).toUpperCase()}`;
+
     return {
       _id: emp._id,
       id: emp._id,
+      employeeId: displayEmployeeId,
       name: emp.name,
       username: emp.username,
       email: emp.email,
+      phone: emp.phone || '',
       role: emp.role,
       status: emp.status,
       createdAt: emp.createdAt,
@@ -67,12 +71,16 @@ const getEmployeeById = asyncHandler(async (req, res) => {
     };
   });
 
+  const displayEmployeeId = employee.employeeId || `EMP-${String(employee._id).slice(-4).toUpperCase()}`;
+
   return ApiResponse.success(res, 'Employee details retrieved', {
     _id: employee._id,
     id: employee._id,
+    employeeId: displayEmployeeId,
     name: employee.name,
     username: employee.username,
     email: employee.email,
+    phone: employee.phone || '',
     role: employee.role,
     status: employee.status,
     createdAt: employee.createdAt,
@@ -87,7 +95,7 @@ const getEmployeeById = asyncHandler(async (req, res) => {
  * @access  Private (Admin Only)
  */
 const createEmployee = asyncHandler(async (req, res) => {
-  const { name, username, email, password, role = 'Employee', status = 'Active' } = req.body;
+  const { name, username, email, password, role = 'Employee', status = 'Active', employeeId, phone, permissions } = req.body;
 
   if (!name || !username || !email || !password) {
     return ApiResponse.error(
@@ -96,6 +104,25 @@ const createEmployee = asyncHandler(async (req, res) => {
       ['Missing required employee parameters'],
       400
     );
+  }
+
+  // Validate full name: letters and spaces only, no numbers allowed
+  if (/\d/.test(name) || !/^[a-zA-Z\s]+$/.test(name.trim())) {
+    return ApiResponse.error(res, 'Full name cannot contain numbers or special characters. Alphabetic characters only.', ['Invalid name format'], 400);
+  }
+
+  // Validate phone contact: must start with +92 and be exactly 13 characters
+  if (phone) {
+    const cleanPhone = String(phone).trim();
+    if (!cleanPhone.startsWith('+92')) {
+      return ApiResponse.error(res, 'Phone number must start with "+92" (e.g. +923001234567).', ['Invalid phone prefix'], 400);
+    }
+    if (cleanPhone.length !== 13) {
+      return ApiResponse.error(res, `Phone number must be exactly 13 characters (received ${cleanPhone.length}).`, ['Invalid phone length'], 400);
+    }
+    if (!/^\+92\d{10}$/.test(cleanPhone)) {
+      return ApiResponse.error(res, 'Phone number must be +92 followed by 10 digits.', ['Invalid phone digits'], 400);
+    }
   }
 
   // Check unique username & email
@@ -111,17 +138,41 @@ const createEmployee = asyncHandler(async (req, res) => {
     return ApiResponse.error(res, `${field} is already in use.`, [`Duplicate ${field}`], 409);
   }
 
+  const generatedId = employeeId?.trim() || `EMP-${String(Date.now()).slice(-3)}`;
+
   const employee = await Employee.create({
+    employeeId: generatedId,
     name: name.trim(),
     username: username.toLowerCase().trim(),
     email: email.toLowerCase().trim(),
+    phone: phone?.trim() || '',
     password,
     role,
     status,
   });
 
-  // Seed default permission records
-  await Permission.seedDefaultsForEmployee(employee._id, employee.role);
+  // Save custom or default permissions
+  if (permissions && typeof permissions === 'object' && Object.keys(permissions).length > 0) {
+    const modules = ['medicines', 'inventory', 'sales', 'employees', 'reports'];
+    for (const mod of modules) {
+      const p = permissions[mod] || {};
+      await Permission.findOneAndUpdate(
+        { employeeId: employee._id, moduleName: mod },
+        {
+          $set: {
+            canView: p.view !== undefined ? Boolean(p.view) : Boolean(p.canView),
+            canAdd: p.add !== undefined ? Boolean(p.add) : Boolean(p.canAdd),
+            canEdit: p.edit !== undefined ? Boolean(p.edit) : Boolean(p.canEdit),
+            canDelete: p.delete !== undefined ? Boolean(p.delete) : Boolean(p.canDelete),
+          },
+        },
+        { upsert: true, new: true }
+      );
+    }
+  } else {
+    // Seed default permission records
+    await Permission.seedDefaultsForEmployee(employee._id, employee.role);
+  }
 
   const permissionsList = await Permission.find({ employeeId: employee._id });
   const permissionsMap = {};
@@ -137,9 +188,11 @@ const createEmployee = asyncHandler(async (req, res) => {
   const payload = {
     _id: employee._id,
     id: employee._id,
+    employeeId: employee.employeeId,
     name: employee.name,
     username: employee.username,
     email: employee.email,
+    phone: employee.phone || '',
     role: employee.role,
     status: employee.status,
     createdAt: employee.createdAt,
@@ -162,7 +215,7 @@ const updateEmployee = asyncHandler(async (req, res) => {
     return ApiResponse.error(res, 'Employee not found', ['No employee matches identifier'], 404);
   }
 
-  const { name, email, role, status } = req.body;
+  const { name, email, role, status, phone, employeeId, permissions } = req.body;
 
   // Rule 7: Prevent employees from changing their roles
   if (req.user.role !== 'Admin' && role && role !== employee.role) {
@@ -187,22 +240,86 @@ const updateEmployee = asyncHandler(async (req, res) => {
     }
   }
 
-  if (name) employee.name = name.trim();
+  if (name) {
+    if (/\d/.test(name) || !/^[a-zA-Z\s]+$/.test(name.trim())) {
+      return ApiResponse.error(res, 'Full name cannot contain numbers or special characters. Alphabetic characters only.', ['Invalid name format'], 400);
+    }
+    employee.name = name.trim();
+  }
   if (email) employee.email = email.toLowerCase().trim();
   if (role) employee.role = role;
   if (status) employee.status = status;
+  if (phone !== undefined) {
+    const cleanPhone = String(phone).trim();
+    if (cleanPhone) {
+      if (!cleanPhone.startsWith('+92')) {
+        return ApiResponse.error(res, 'Phone number must start with "+92" (e.g. +923001234567).', ['Invalid phone prefix'], 400);
+      }
+      if (cleanPhone.length !== 13) {
+        return ApiResponse.error(res, `Phone number must be exactly 13 characters (received ${cleanPhone.length}).`, ['Invalid phone length'], 400);
+      }
+      if (!/^\+92\d{10}$/.test(cleanPhone)) {
+        return ApiResponse.error(res, 'Phone number must be +92 followed by 10 digits.', ['Invalid phone digits'], 400);
+      }
+    }
+    employee.phone = cleanPhone;
+  }
+  if (employeeId !== undefined && employeeId.trim()) employee.employeeId = employeeId.trim();
 
   await employee.save();
+
+  // Save updated permissions if provided in payload
+  if (permissions && typeof permissions === 'object') {
+    const modules = ['medicines', 'inventory', 'sales', 'employees', 'reports'];
+    for (const mod of modules) {
+      if (permissions[mod]) {
+        const p = permissions[mod];
+        await Permission.findOneAndUpdate(
+          { employeeId: employee._id, moduleName: mod },
+          {
+            $set: {
+              canView: p.view !== undefined ? Boolean(p.view) : (p.canView !== undefined ? Boolean(p.canView) : false),
+              canAdd: p.add !== undefined ? Boolean(p.add) : (p.canAdd !== undefined ? Boolean(p.canAdd) : false),
+              canEdit: p.edit !== undefined ? Boolean(p.edit) : (p.canEdit !== undefined ? Boolean(p.canEdit) : false),
+              canDelete: p.delete !== undefined ? Boolean(p.delete) : (p.canDelete !== undefined ? Boolean(p.canDelete) : false),
+            },
+          },
+          { upsert: true, new: true }
+        );
+      }
+    }
+  }
+
+  // Retrieve current permissions for updated employee
+  const allPermissions = await Permission.find({ employeeId: employee._id });
+  const permissionsMap = {};
+  allPermissions.forEach((p) => {
+    permissionsMap[p.moduleName] = {
+      view: p.canView,
+      add: p.canAdd,
+      edit: p.canEdit,
+      delete: p.canDelete,
+      canView: p.canView,
+      canAdd: p.canAdd,
+      canEdit: p.canEdit,
+      canDelete: p.canDelete,
+    };
+  });
+
+  const displayEmployeeId = employee.employeeId || `EMP-${String(employee._id).slice(-4).toUpperCase()}`;
 
   return ApiResponse.success(res, 'Employee updated successfully', {
     _id: employee._id,
     id: employee._id,
+    employeeId: displayEmployeeId,
     name: employee.name,
     username: employee.username,
     email: employee.email,
+    phone: employee.phone || '',
     role: employee.role,
     status: employee.status,
     updatedAt: employee.updatedAt,
+    permissions: permissionsMap,
   });
 });
 

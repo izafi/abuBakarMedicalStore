@@ -28,9 +28,9 @@ export const DiscountInput = ({
           value={discountPercentage === 0 ? '' : discountPercentage}
           onChange={handleChange}
           placeholder="0"
-          className="w-12 h-7 px-1.5 pr-4 text-xs font-semibold text-right bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#1C9A58] text-gray-900"
+          className="w-11 h-7 pl-1 pr-3.5 text-xs font-bold font-mono text-right bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-[#1C9A58] text-black shadow-xs"
         />
-        <Percent className="w-2.5 h-2.5 text-gray-400 absolute right-1 pointer-events-none" />
+        <Percent className="w-2.5 h-2.5 text-black absolute right-1 pointer-events-none" />
       </div>
 
       {/* Quick discount chips */}
@@ -40,11 +40,11 @@ export const DiscountInput = ({
             key={pct}
             type="button"
             disabled={disabled}
-            onClick={() => onDiscountChange(pct)}
-            className={`px-1 py-0.5 text-[9px] font-bold rounded transition-colors ${
+            onClick={() => onDiscountChange(discountPercentage === pct ? 0 : pct)}
+            className={`px-1.5 py-0.5 text-[9px] font-bold rounded transition-colors cursor-pointer disabled:cursor-not-allowed ${
               discountPercentage === pct
-                ? 'bg-[#1C9A58] text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-[#1C9A58] text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-black border border-slate-200'
             }`}
           >
             {pct}%

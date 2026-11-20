@@ -6,6 +6,7 @@ const {
   getMe,
   verifyPassword,
   changePassword,
+  forgotPassword,
   getDemoAccounts,
 } = require('../controller/authController');
 const { authenticate, optionalAuth } = require('../middleware/authMiddleware');
@@ -22,6 +23,7 @@ const router = express.Router();
 // Public Authentication Endpoints
 router.post('/login', loginRateLimiter, validateLogin, login);
 router.post('/logout', logout);
+router.post('/forgot-password', forgotPassword);
 router.get('/demo-accounts', getDemoAccounts);
 
 // Registration (Admin only or bootstrap)
