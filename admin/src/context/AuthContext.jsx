@@ -64,12 +64,17 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     fetchEmployees();
-    // Auto-authenticate default terminal admin if token not present in memory
-    if (!getAuthToken()) {
-      authService.login('huzaifazafi', 'admin1234').catch((e) => {
-        console.warn('[AuthContext] Terminal auto-auth notice:', e.message);
+    // Retrieve authenticated terminal session from backend
+    authService
+      .getMe()
+      .then((res) => {
+        if (res?.data) {
+          setCurrentUser(res.data);
+        }
+      })
+      .catch((e) => {
+        console.warn('[AuthContext] Terminal session info notice:', e.message);
       });
-    }
   }, [fetchEmployees]);
 
   // Login via API with credentials
