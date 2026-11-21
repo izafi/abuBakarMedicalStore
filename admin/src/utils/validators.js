@@ -194,25 +194,11 @@ export const validateBatch = (data, existingBatches = [], medicines = [], editin
 };
 
 /**
- * Validate Step 1 Patient Information during checkout
+ * Validate Step 1 Patient Information during checkout (Optional)
  */
-export const validatePatientInfo = (info) => {
-  const errors = {};
-
-  if (!info.patientName || !String(info.patientName).trim()) {
-    errors.patientName = 'Patient full name is required';
-  }
-
-  if (!info.doctorName || !String(info.doctorName).trim()) {
-    errors.doctorName = 'Prescribing doctor / consultant name is required';
-  }
-
-  if (!info.prescriptionDescription || !String(info.prescriptionDescription).trim()) {
-    errors.prescriptionDescription = 'Prescription description / clinical directions required';
-  }
-
+export const validatePatientInfo = (info = {}) => {
   return {
-    isValid: Object.keys(errors).length === 0,
-    errors,
+    isValid: true,
+    errors: {},
   };
 };

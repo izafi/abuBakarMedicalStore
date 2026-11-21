@@ -128,6 +128,29 @@ const updateSettings = asyncHandler(async (req, res) => {
     }
   });
 
+  // Ensure reciprocal aliases are synchronized
+  if (req.body.phone !== undefined) {
+    settings.phone = String(req.body.phone).trim();
+    settings.contactNumber = settings.phone;
+  } else if (req.body.contactNumber !== undefined) {
+    settings.contactNumber = String(req.body.contactNumber).trim();
+    settings.phone = settings.contactNumber;
+  }
+
+  if (req.body.nearExpiryDays !== undefined) {
+    const days = Math.max(1, Number(req.body.nearExpiryDays) || 60);
+    settings.nearExpiryDays = days;
+    settings.expiryWarningDays = days;
+  } else if (req.body.expiryWarningDays !== undefined) {
+    const days = Math.max(1, Number(req.body.expiryWarningDays) || 60);
+    settings.nearExpiryDays = days;
+    settings.expiryWarningDays = days;
+  }
+
+  if (req.body.lowStockThreshold !== undefined) {
+    settings.lowStockThreshold = Math.max(1, Number(req.body.lowStockThreshold) || 10);
+  }
+
   // Track updating administrator
   settings.updatedBy = req.user?.name || req.user?.username || 'Administrator';
   settings.updatedByEmployeeId = req.user?._id?.toString() || '';

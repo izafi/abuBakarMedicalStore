@@ -9,14 +9,23 @@ import { salesService } from '../services/salesService';
 import { SalesContext } from './contexts';
 
 // Helper to compute subtotal, discount, and final total for a cart item
-const computeItemTotals = (unitPrice, quantity, discountPercentage = 0) => {
+const computeItemTotals = (unitPrice, quantity, discountPercentage = 0, discountAmountParam = null) => {
   const safePrice = Math.max(0, Number(unitPrice) || 0);
   const safeQty = Math.max(1, parseInt(quantity, 10) || 1);
-  const safeDiscount = Math.min(100, Math.max(0, Number(discountPercentage) || 0));
-
   const subtotal = safePrice * safeQty;
-  const discountAmount = (subtotal * safeDiscount) / 100;
-  const finalTotal = Math.max(0, subtotal - discountAmount);
+
+  let safeDiscount = 0;
+  let discountAmount = 0;
+
+  if (discountAmountParam !== null && discountAmountParam !== undefined && discountAmountParam !== '') {
+    discountAmount = Math.min(subtotal, Math.max(0, Number(discountAmountParam) || 0));
+    safeDiscount = subtotal > 0 ? Number(((discountAmount / subtotal) * 100).toFixed(2)) : 0;
+  } else {
+    safeDiscount = Math.min(100, Math.max(0, Number(discountPercentage) || 0));
+    discountAmount = Number(((subtotal * safeDiscount) / 100).toFixed(2));
+  }
+
+  const finalTotal = Math.max(0, Number((subtotal - discountAmount).toFixed(2)));
 
   return {
     subtotal,
@@ -90,24 +99,67 @@ export const SalesProvider = ({ children }) => {
 
   // Add Item to Cart
   const addToCart = useCallback(
-    (medicine, selectedBatchId = null) => {
-      const medBatches = batches.filter(
-        (b) =>
+    (medicine, arg2 = null, arg3 = null) => {
+      // Support flexible call signatures:
+      // 1. addToCart(medicine, quantity, batchOrBatchId) - e.g. from MedicineCounter & POS
+      // 2. addToCart(medicine, batchOrBatchId)
+      // 3. addToCart(medicine)
+      let quantityToAdd = 1;
+      let batchParam = null;
+
+      if (typeof arg2 === 'number') {
+        quantityToAdd = Math.max(1, parseInt(arg2, 10) || 1);
+        batchParam = arg3;
+      } else {
+        batchParam = arg2;
+      }
+
+      const canonicalMedId = medicine.medicineId || medicine.id || medicine._id;
+      const medBatches = batches.filter((b) => {
+        const bMedId =
+          typeof b.medicineId === 'object' && b.medicineId !== null
+            ? b.medicineId.medicineId || b.medicineId._id || b.medicineId.id
+            : b.medicineId;
+        return (
+          bMedId === canonicalMedId ||
+          bMedId === medicine.medicineId ||
           b.medicineId === medicine.medicineId ||
           b.medicineId === medicine.id ||
           b.medicineId === medicine._id ||
-          b.medicineCode === medicine.medicineId
-      );
+          b.medicineCode === medicine.medicineId ||
+          b.medicineCode === canonicalMedId
+        );
+      });
 
       let targetBatch = null;
 
-      if (selectedBatchId) {
-        targetBatch = medBatches.find(
-          (b) => b.batchId === selectedBatchId || b.id === selectedBatchId || b._id === selectedBatchId
-        );
-      } else {
+      if (batchParam && typeof batchParam === 'object') {
+        // Direct batch object passed
+        targetBatch = batchParam;
+      } else if (typeof batchParam === 'string' && batchParam.trim()) {
+        const searchId = batchParam.trim();
+        targetBatch =
+          medBatches.find(
+            (b) =>
+              b.batchId === searchId ||
+              b.id === searchId ||
+              b._id === searchId ||
+              b.batchNumber === searchId ||
+              b.batchNo === searchId
+          ) ||
+          batches.find(
+            (b) =>
+              b.batchId === searchId ||
+              b.id === searchId ||
+              b._id === searchId ||
+              b.batchNumber === searchId ||
+              b.batchNo === searchId
+          );
+      }
+
+      if (!targetBatch) {
         const sellable = medBatches
-          .filter((b) => canSellBatch(b) && b.quantity > 0)
+          .filter((b) => canSellBatch(b) && Number(b.quantity) > 0)
           .sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
         targetBatch = sellable[0] || null;
       }
@@ -129,7 +181,7 @@ export const SalesProvider = ({ children }) => {
 
         if (existingIndex > -1) {
           const existing = prev[existingIndex];
-          const newQty = existing.quantity + 1;
+          const newQty = existing.quantity + quantityToAdd;
 
           if (newQty > targetBatch.quantity) {
             throw new Error(
@@ -151,7 +203,17 @@ export const SalesProvider = ({ children }) => {
           return updatedCart;
         }
 
-        const totals = computeItemTotals(targetBatch.sellingPrice || medicine.sellingPrice || 0, 1, 0);
+        if (quantityToAdd > targetBatch.quantity) {
+          throw new Error(
+            `Cannot add ${quantityToAdd} units. Available stock in batch "${targetBatch.batchNumber || targetBatch.batchNo}" is ${targetBatch.quantity}.`
+          );
+        }
+
+        const totals = computeItemTotals(
+          targetBatch.sellingPrice || medicine.sellingPrice || 0,
+          quantityToAdd,
+          0
+        );
 
         const newCartItem = {
           cartItemId: `cart_${Date.now()}_${Math.floor(10 + Math.random() * 90)}`,
@@ -212,18 +274,31 @@ export const SalesProvider = ({ children }) => {
     [batches, removeFromCart]
   );
 
-  // Update Cart Item Discount
-  const updateCartDiscount = useCallback((cartItemId, discountPercentage) => {
+  // Update Cart Item Discount (supports custom % or flat Rs amount)
+  const updateCartDiscount = useCallback((cartItemId, discountPercentage, customDiscountAmount = null) => {
     setCart((prev) =>
       prev.map((item) => {
         if (item.cartItemId === cartItemId || item.batchId === cartItemId) {
-          const totals = computeItemTotals(item.unitPrice, item.quantity, discountPercentage);
+          const totals = computeItemTotals(item.unitPrice, item.quantity, discountPercentage, customDiscountAmount);
           return {
             ...item,
             ...totals,
           };
         }
         return item;
+      })
+    );
+  }, []);
+
+  // Apply Discount Across All Items in the Cart
+  const applyCartDiscountToAll = useCallback((discountPercentage, customDiscountAmount = null) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        const totals = computeItemTotals(item.unitPrice, item.quantity, discountPercentage, customDiscountAmount);
+        return {
+          ...item,
+          ...totals,
+        };
       })
     );
   }, []);
@@ -304,16 +379,16 @@ export const SalesProvider = ({ children }) => {
         throw new Error('Active sales cart is empty.');
       }
 
+      const rawPatient = overrideDetails.patientInfo || overrideDetails || {};
       const patientInfo = {
-        patientName: overrideDetails.patientName || customerInfo.name || 'Walk-in Customer',
-        doctorName: overrideDetails.doctorName || 'Self / Counter',
+        patientName:
+          (rawPatient.patientName || customerInfo.name || '').trim() || 'Walk-in Customer',
+        doctorName: (rawPatient.doctorName || '').trim() || 'Self / Counter',
         prescriptionDescription:
-          overrideDetails.prescriptionDescription ||
-          overrideDetails.prescription ||
+          (rawPatient.prescriptionDescription || rawPatient.prescription || '').trim() ||
           'Counter dispensing',
         prescriptionReferenceNumber:
-          overrideDetails.prescriptionReferenceNumber ||
-          overrideDetails.prescriptionRef ||
+          (rawPatient.prescriptionReferenceNumber || rawPatient.prescriptionRef || '').trim() ||
           'N/A',
       };
 
@@ -515,6 +590,7 @@ export const SalesProvider = ({ children }) => {
         addToCart,
         updateCartQuantity,
         updateCartDiscount,
+        applyCartDiscountToAll,
         updateCartBatch,
         removeFromCart,
         clearCart,

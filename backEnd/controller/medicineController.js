@@ -198,6 +198,24 @@ const searchMedicines = asyncHandler(async (req, res) => {
   return ApiResponse.success(res, `Found ${enriched.length} matching medicines`, enriched);
 });
 
+const DEFAULT_CATEGORIES = [
+  'Antibiotics',
+  'Analgesics / Antipyretics',
+  'NSAIDs',
+  'Gastrointestinal',
+  'Antihistamines',
+  'Cardiovascular',
+  'Antidiabetic',
+  'Respiratory',
+  'Dermatological',
+  'Vitamins & Supplements',
+  'Neurological / Psychiatric',
+  'Ophthalmic / Otic',
+  'Antiviral',
+  'Antifungal',
+  'Other',
+];
+
 /**
  * @desc    Get all distinct medicine categories
  * @route   GET /api/v1/medicines/categories
@@ -205,8 +223,9 @@ const searchMedicines = asyncHandler(async (req, res) => {
  */
 const getCategories = asyncHandler(async (req, res) => {
   const categories = await Medicine.distinct('category', { isActive: { $ne: false } });
-  const cleaned = categories.filter((c) => c && c.trim() !== '').sort();
-  return ApiResponse.success(res, 'Medicine categories retrieved', cleaned);
+  const cleaned = categories.filter((c) => c && c.trim() !== '');
+  const merged = Array.from(new Set([...cleaned, ...DEFAULT_CATEGORIES])).sort();
+  return ApiResponse.success(res, 'Medicine categories retrieved', merged);
 });
 
 /**

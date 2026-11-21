@@ -163,19 +163,39 @@ export const MedicineCounter = () => {
       return;
     }
 
-    const medBatches = batches.filter(
-      (b) => b.medicineId === med.medicineId && b.canSell && b.quantity > 0
-    );
+    const canonicalMedId = med.medicineId || med.id || med._id;
+    const medBatches = batches.filter((b) => {
+      const bMedId =
+        typeof b.medicineId === 'object' && b.medicineId !== null
+          ? b.medicineId.medicineId || b.medicineId._id || b.medicineId.id
+          : b.medicineId;
+      return (
+        (bMedId === canonicalMedId ||
+          bMedId === med.medicineId ||
+          b.medicineId === med.medicineId ||
+          b.medicineId === med.id ||
+          b.medicineId === med._id ||
+          b.medicineCode === med.medicineId ||
+          b.medicineCode === canonicalMedId) &&
+        b.canSell &&
+        Number(b.quantity) > 0
+      );
+    });
 
     if (medBatches.length === 0) {
       toast.showError(`"${med.name}" has no available sellable stock! All batches are expired or depleted.`);
       return;
     }
 
-    const chosenBatchId = selectedBatchMap[med.medicineId];
+    const chosenBatchId = selectedBatchMap[med.medicineId] || selectedBatchMap[canonicalMedId];
     const targetBatch =
-      medBatches.find((b) => b.batchId === chosenBatchId || b.id === chosenBatchId) ||
-      medBatches[0];
+      medBatches.find(
+        (b) =>
+          b.batchId === chosenBatchId ||
+          b.id === chosenBatchId ||
+          b._id === chosenBatchId ||
+          b.batchNumber === chosenBatchId
+      ) || medBatches[0];
 
     try {
       addToCart(med, 1, targetBatch);

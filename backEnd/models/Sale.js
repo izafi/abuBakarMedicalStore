@@ -35,19 +35,19 @@ const saleSchema = new mongoose.Schema(
     },
     patientName: {
       type: String,
-      required: [true, 'Patient name is required'],
+      default: 'Walk-in Customer',
       trim: true,
       index: true,
     },
     doctorName: {
       type: String,
-      required: [true, 'Doctor name is required'],
+      default: 'Self / Counter',
       trim: true,
       index: true,
     },
     prescription: {
       type: String,
-      required: [true, 'Prescription description is required'],
+      default: 'Counter dispensing',
       trim: true,
     },
     prescriptionRef: {

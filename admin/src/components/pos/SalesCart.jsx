@@ -20,6 +20,7 @@ export const SalesCart = ({
   onRemoveItem,
   onClearCart,
   onCheckout,
+  onApplyCartDiscount,
   cashierName,
   canAddSale = true,
 }) => {
@@ -127,6 +128,7 @@ export const SalesCart = ({
         onCheckout={onCheckout}
         disabled={cart.length === 0 || !canAddSale}
         cashierName={cashierName}
+        onApplyCartDiscount={onApplyCartDiscount}
       />
     </Card>
   );

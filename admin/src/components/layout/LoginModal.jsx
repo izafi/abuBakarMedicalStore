@@ -12,11 +12,13 @@ import {
 } from 'lucide-react';
 import { APP_INFO } from '../../utils/constants';
 import { useAuth } from '../../hooks/useAuth';
+import { useSettings } from '../../hooks/useSettings';
 import { authService } from '../../services/authService';
 import { alert } from '../../utils/sweetAlert';
 
 export const LoginModal = () => {
   const { login, isAuthenticated } = useAuth();
+  const { settings } = useSettings();
 
   const [mode, setMode] = useState('login'); // 'login' | 'forgot'
   const [identifier, setIdentifier] = useState('huzaifazafi156@gmail.com');
@@ -138,10 +140,10 @@ export const LoginModal = () => {
           </div>
 
           <h2 className="text-base sm:text-lg font-extrabold tracking-tight text-white leading-tight">
-            {APP_INFO.NAME}
+            {settings?.storeName || APP_INFO.NAME}
           </h2>
           <p className="text-[10px] text-[#A3D9BE] font-bold tracking-wider uppercase mt-0.5">
-            {APP_INFO.TAGLINE}
+            {settings?.tagline || APP_INFO.TAGLINE}
           </p>
 
           <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-[11px] text-emerald-200 font-semibold border border-white/10">

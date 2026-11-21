@@ -20,6 +20,7 @@ import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { useInventory } from '../../hooks/useInventory';
 import { useAuth } from '../../hooks/useAuth';
+import { useSettings } from '../../hooks/useSettings';
 import { useToast } from '../../hooks/useToast';
 import { USER_ROLES } from '../../utils/constants';
 import { alert } from '../../utils/sweetAlert';
@@ -33,6 +34,7 @@ export const Header = ({
   const location = useLocation();
   const { analytics } = useInventory();
   const { currentUser, users, switchUser, logout } = useAuth();
+  const { settings } = useSettings();
   const toast = useToast();
 
   const [showNotifications, setShowNotifications] = useState(false);
@@ -71,7 +73,7 @@ export const Header = ({
       case '/settings':
         return 'System Settings';
       default:
-        return 'Abu Bakar Medical Store';
+        return settings?.storeName || 'Abu Bakar Medical Store';
     }
   };
 
@@ -114,7 +116,7 @@ export const Header = ({
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-[#1C9A58] animate-pulse" />
                 <span className="text-[11px] text-gray-500 font-medium">
-                  Pharmacy System • Live API Connected
+                  {settings?.tagline || 'Pharmacy System'} • Live API Connected
                 </span>
               </div>
             </div>

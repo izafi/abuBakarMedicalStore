@@ -80,6 +80,26 @@ export const MEDICINE_TYPES = [
   'Other',
 ];
 
+export const DEFAULT_THERAPEUTIC_CATEGORIES = [
+  'Antibiotics',
+  'Analgesics / Antipyretics',
+  'NSAIDs',
+  'Gastrointestinal',
+  'Antihistamines',
+  'Cardiovascular',
+  'Antidiabetic',
+  'Respiratory',
+  'Dermatological',
+  'Vitamins & Supplements',
+  'Neurological / Psychiatric',
+  'Ophthalmic / Otic',
+  'Antiviral',
+  'Antifungal',
+  'Hormones & Endocrine',
+  'Antiseptics & Disinfectants',
+  'Other',
+];
+
 export const PAYMENT_METHODS = {
   CASH: 'Cash',
   CARD: 'Debit/Credit Card',

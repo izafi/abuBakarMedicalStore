@@ -594,7 +594,7 @@ export const Reports = () => {
         <div>
           <span className="text-[10px] font-mono uppercase tracking-widest text-[#1C9A58] font-bold flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-[#1C9A58] animate-pulse"></span>
-            {APP_INFO.NAME} &bull; OFFICIAL AUDIT
+            {settings?.storeName || APP_INFO.NAME} &bull; OFFICIAL AUDIT
           </span>
           <h2 className="text-lg sm:text-xl font-bold text-black mt-0.5">
             {activeReport.name}

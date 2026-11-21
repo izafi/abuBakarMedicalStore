@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Pill,
   Tag,
@@ -18,7 +18,7 @@ import {
   Stethoscope,
 } from 'lucide-react';
 import { Modal } from '../common/Modal';
-import { MEDICINE_TYPES } from '../../utils/constants';
+import { MEDICINE_TYPES, DEFAULT_THERAPEUTIC_CATEGORIES } from '../../utils/constants';
 import { validateMedicine } from '../../utils/validators';
 
 const POPULAR_MEDICINE_TYPES = [
@@ -33,6 +33,11 @@ const POPULAR_MEDICINE_TYPES = [
 ];
 
 const getInitialFormData = (initialData, categories) => {
+  const fallbackCat =
+    (categories && categories.length > 0 && categories[0]) ||
+    DEFAULT_THERAPEUTIC_CATEGORIES[0] ||
+    'Antibiotics';
+
   if (initialData) {
     return {
       medicineId: initialData.medicineId || '',
@@ -42,7 +47,7 @@ const getInitialFormData = (initialData, categories) => {
       formula: initialData.formula || '',
       strength: initialData.strength || '',
       type: initialData.type || 'Tablet',
-      category: initialData.category || categories[0] || 'Antibiotics',
+      category: initialData.category || fallbackCat,
       usage: initialData.usage || '',
       manufacturer: initialData.manufacturer || '',
       minStockAlert: String(initialData.minStockAlert ?? '20'),
@@ -50,12 +55,16 @@ const getInitialFormData = (initialData, categories) => {
       initialQuantity: '',
       purchasePrice: '',
       sellingPrice: '',
+      manufacturingDate: '',
       expiryDate: '',
+      rack: '',
+      shelf: '',
       location: '',
     };
   }
 
   const generatedId = `MED-${Math.floor(1000 + Math.random() * 9000)}`;
+  const today = new Date().toISOString().split('T')[0];
   return {
     medicineId: generatedId,
     name: '',
@@ -64,7 +73,7 @@ const getInitialFormData = (initialData, categories) => {
     formula: '',
     strength: '',
     type: 'Tablet',
-    category: categories[0] || 'Antibiotics',
+    category: fallbackCat,
     usage: '',
     manufacturer: '',
     minStockAlert: '20',
@@ -72,7 +81,10 @@ const getInitialFormData = (initialData, categories) => {
     initialQuantity: '50',
     purchasePrice: '20.00',
     sellingPrice: '30.00',
+    manufacturingDate: today,
     expiryDate: '2027-12-31',
+    rack: 'Rack A-1',
+    shelf: 'Shelf 1',
     location: 'Rack A-1, Shelf 1',
   };
 };
@@ -87,19 +99,23 @@ export const MedicineForm = ({
 }) => {
   const isEditing = Boolean(initialData);
 
+  const combinedCategories = useMemo(() => {
+    const list = Array.from(
+      new Set([...(categories || []), ...DEFAULT_THERAPEUTIC_CATEGORIES])
+    ).filter(Boolean);
+    return list.length > 0 ? list : DEFAULT_THERAPEUTIC_CATEGORIES;
+  }, [categories]);
+
   const [formData, setFormData] = useState(() =>
     getInitialFormData(initialData, categories)
   );
   const [errors, setErrors] = useState({});
-  const [showInitialBatch, setShowInitialBatch] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-      // Auto-populate brand if empty and product name is typed
-      brand: name === 'name' && !prev.brand ? value : prev.brand,
     }));
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: null }));
@@ -121,8 +137,54 @@ export const MedicineForm = ({
       initialData ? initialData.medicineId : null
     );
 
-    if (!validation.isValid) {
-      setErrors(validation.errors);
+    const batchErrors = {};
+    if (!isEditing) {
+      if (!formData.batchNo || !formData.batchNo.trim()) {
+        batchErrors.batchNo = 'Initial batch code is required (e.g. BAT-101)';
+      }
+      if (
+        formData.initialQuantity === '' ||
+        isNaN(Number(formData.initialQuantity)) ||
+        Number(formData.initialQuantity) < 0
+      ) {
+        batchErrors.initialQuantity = 'Initial stock quantity is required (>= 0)';
+      }
+      if (
+        formData.purchasePrice === '' ||
+        isNaN(Number(formData.purchasePrice)) ||
+        Number(formData.purchasePrice) <= 0
+      ) {
+        batchErrors.purchasePrice = 'Cost price is required (> 0)';
+      }
+      if (
+        formData.sellingPrice === '' ||
+        isNaN(Number(formData.sellingPrice)) ||
+        Number(formData.sellingPrice) <= 0
+      ) {
+        batchErrors.sellingPrice = 'Selling price is required (> 0)';
+      }
+      if (!formData.manufacturingDate) {
+        batchErrors.manufacturingDate = 'Manufacturing date is required';
+      }
+      if (!formData.expiryDate) {
+        batchErrors.expiryDate = 'Batch expiry date is required';
+      } else if (
+        formData.manufacturingDate &&
+        new Date(formData.expiryDate) <= new Date(formData.manufacturingDate)
+      ) {
+        batchErrors.expiryDate = 'Expiry date must be after manufacturing date';
+      }
+      if (!formData.rack || !formData.rack.trim()) {
+        batchErrors.rack = 'Storage rack is required';
+      }
+      if (!formData.shelf || !formData.shelf.trim()) {
+        batchErrors.shelf = 'Storage shelf / bin is required';
+      }
+    }
+
+    const allErrors = { ...validation.errors, ...batchErrors };
+    if (Object.keys(allErrors).length > 0) {
+      setErrors(allErrors);
       return;
     }
 
@@ -140,17 +202,19 @@ export const MedicineForm = ({
         manufacturer: formData.manufacturer.trim(),
         minStockAlert: Number(formData.minStockAlert) || 20,
       },
-      initialBatch:
-        !isEditing && showInitialBatch && formData.batchNo
-          ? {
-              batchNo: formData.batchNo.trim(),
-              quantity: Number(formData.initialQuantity) || 0,
-              purchasePrice: Number(formData.purchasePrice) || 0,
-              sellingPrice: Number(formData.sellingPrice) || 0,
-              expiryDate: formData.expiryDate || '2027-12-31',
-              location: formData.location.trim() || 'Rack A-1, Shelf 1',
-            }
-          : null,
+      initialBatch: !isEditing
+        ? {
+            batchNo: formData.batchNo.trim(),
+            quantity: Number(formData.initialQuantity) || 0,
+            purchasePrice: Number(formData.purchasePrice) || 0,
+            sellingPrice: Number(formData.sellingPrice) || 0,
+            manufacturingDate: formData.manufacturingDate,
+            expiryDate: formData.expiryDate || '2027-12-31',
+            rack: formData.rack.trim() || 'Rack A-1',
+            shelf: formData.shelf.trim() || 'Shelf 1',
+            location: `${formData.rack.trim() || 'Rack A-1'}, ${formData.shelf.trim() || 'Shelf 1'}`,
+          }
+        : null,
     };
 
     onSave(payload);
@@ -215,31 +279,26 @@ export const MedicineForm = ({
         </div>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-3.5">
+      <form onSubmit={handleSubmit} className="space-y-3">
         {/* ========================================================
-            CARD 1: MEDICINE IDENTITY & BRAND (EMERALD / TEAL THEME)
+            CARD 1: MEDICINE IDENTITY & BRAND (EMERALD THEME)
             ======================================================== */}
-        <div className="p-3.5 sm:p-4 rounded-xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/50 via-white to-teal-50/20 shadow-2xs space-y-3 transition-all">
+        <div className="p-3 sm:p-3.5 rounded-xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/40 via-white to-teal-50/20 shadow-2xs space-y-2.5">
           <div className="flex items-center justify-between pb-1.5 border-b border-emerald-100">
             <div className="flex items-center gap-2">
               <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-1 rounded-md shadow-2xs">
                 <Tag className="w-3.5 h-3.5" />
               </span>
-              <div>
-                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
-                  Medicine Identity & Brand
-                </h3>
-                <p className="text-[11px] text-neutral-800 font-medium">
-                  Primary trade names, identifiers, and commercial branding
-                </p>
-              </div>
+              <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+                Medicine Identity & Brand
+              </h3>
             </div>
-            <span className="text-[11px] font-mono font-bold text-black bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 shadow-2xs">
+            <span className="text-[11px] font-mono font-bold text-black bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
               {formData.medicineId}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {/* Medicine ID */}
             <div>
               <label className="flex items-center gap-1 text-xs font-bold text-black mb-1">
@@ -254,16 +313,12 @@ export const MedicineForm = ({
                 value={formData.medicineId}
                 onChange={handleChange}
                 placeholder="e.g. MED-1001"
-                className="w-full h-9 px-3 text-xs font-mono font-bold bg-white border border-emerald-300 rounded-lg text-black focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/30 disabled:opacity-75 disabled:bg-slate-50 transition-all"
+                className="w-full h-8 px-2.5 text-xs font-mono font-bold bg-white border border-emerald-300 rounded-lg text-black focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/30 disabled:opacity-75 disabled:bg-slate-50"
               />
-              {errors.medicineId ? (
+              {errors.medicineId && (
                 <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3 shrink-0" /> {errors.medicineId}
                 </p>
-              ) : (
-                <span className="text-[11px] text-neutral-700 font-medium mt-1 block">
-                  Unique catalog code
-                </span>
               )}
             </div>
 
@@ -280,20 +335,16 @@ export const MedicineForm = ({
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="e.g. Panadol 500mg"
-                className={`w-full h-9 px-3 text-xs font-bold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
+                className={`w-full h-8 px-2.5 text-xs font-bold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
                   errors.name
-                    ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-200 bg-rose-50/20'
+                    ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20'
                     : 'border-slate-300 hover:border-emerald-400 focus:border-emerald-600 focus:ring-emerald-600/30'
                 }`}
               />
-              {errors.name ? (
+              {errors.name && (
                 <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3 shrink-0" /> {errors.name}
                 </p>
-              ) : (
-                <span className="text-[11px] text-neutral-700 font-medium mt-1 block">
-                  Full packaging name
-                </span>
               )}
             </div>
 
@@ -310,20 +361,16 @@ export const MedicineForm = ({
                 value={formData.brand}
                 onChange={handleChange}
                 placeholder="e.g. Panadol"
-                className={`w-full h-9 px-3 text-xs font-bold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
+                className={`w-full h-8 px-2.5 text-xs font-bold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
                   errors.brand
-                    ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-200 bg-rose-50/20'
+                    ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20'
                     : 'border-slate-300 hover:border-emerald-400 focus:border-emerald-600 focus:ring-emerald-600/30'
                 }`}
               />
-              {errors.brand ? (
+              {errors.brand && (
                 <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3 shrink-0" /> {errors.brand}
                 </p>
-              ) : (
-                <span className="text-[11px] text-neutral-700 font-medium mt-1 block">
-                  Marketing trademark
-                </span>
               )}
             </div>
           </div>
@@ -341,41 +388,32 @@ export const MedicineForm = ({
               value={formData.genericName}
               onChange={handleChange}
               placeholder="e.g. Paracetamol, Amoxicillin + Clavulanic Acid"
-              className={`w-full h-9 px-3 text-xs font-semibold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
+              className={`w-full h-8 px-2.5 text-xs font-semibold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
                 errors.genericName
-                  ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-200 bg-rose-50/20'
+                  ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20'
                   : 'border-slate-300 hover:border-emerald-400 focus:border-emerald-600 focus:ring-emerald-600/30'
               }`}
             />
-            {errors.genericName ? (
+            {errors.genericName && (
               <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3 shrink-0" /> {errors.genericName}
               </p>
-            ) : (
-              <span className="text-[11px] text-neutral-700 font-medium mt-1 block">
-                Official international non-proprietary chemical name for searches
-              </span>
             )}
           </div>
         </div>
 
         {/* ========================================================
-            CARD 2: FORMULATION, DOSAGE & CATEGORY (ROYAL BLUE THEME)
+            CARD 2: FORMULATION & SPECS (BLUE THEME)
             ======================================================== */}
-        <div className="p-3.5 sm:p-4 rounded-xl border border-blue-200/90 bg-gradient-to-br from-blue-50/50 via-white to-indigo-50/20 shadow-2xs space-y-3 transition-all">
+        <div className="p-3 sm:p-3.5 rounded-xl border border-blue-200/90 bg-gradient-to-br from-blue-50/40 via-white to-indigo-50/20 shadow-2xs space-y-2.5">
           <div className="flex items-center justify-between pb-1.5 border-b border-blue-100">
             <div className="flex items-center gap-2">
               <span className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1 rounded-md shadow-2xs">
                 <Layers className="w-3.5 h-3.5" />
               </span>
-              <div>
-                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
-                  Formulation, Type & Classification
-                </h3>
-                <p className="text-[11px] text-neutral-800 font-medium">
-                  Select dosage form, therapeutic category, and safety limits
-                </p>
-              </div>
+              <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+                Formulation, Type & Classification
+              </h3>
             </div>
             <span className="text-[11px] font-bold text-black bg-blue-100 px-2 py-0.5 rounded border border-blue-200">
               {formData.type}
@@ -384,7 +422,7 @@ export const MedicineForm = ({
 
           {/* Quick Select Type Badges */}
           <div>
-            <label className="block text-xs font-bold text-black mb-1.5">
+            <label className="block text-xs font-bold text-black mb-1">
               Select Dosage Form / Type <span className="text-rose-600">*</span>
             </label>
             <div className="flex flex-wrap gap-1.5">
@@ -395,7 +433,7 @@ export const MedicineForm = ({
                     key={t}
                     type="button"
                     onClick={() => handleTypeSelect(t)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`px-2.5 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-blue-600 text-white shadow-2xs ring-1 ring-blue-400'
                         : 'bg-white text-black border border-slate-300 hover:border-blue-400 hover:bg-blue-50/60'
@@ -408,26 +446,7 @@ export const MedicineForm = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Full Medicine Type Dropdown */}
-            <div>
-              <label className="block text-xs font-bold text-black mb-1">
-                All Types Dropdown <span className="text-rose-600">*</span>
-              </label>
-              <select
-                name="type"
-                value={formData.type}
-                onChange={handleChange}
-                className="w-full h-9 px-3 text-xs font-bold bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-black focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600/30 cursor-pointer transition-all"
-              >
-                {MEDICINE_TYPES.map((t, idx) => (
-                  <option key={idx} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {/* Dosage Strength */}
             <div>
               <label className="block text-xs font-bold text-black mb-1">
@@ -439,9 +458,9 @@ export const MedicineForm = ({
                 value={formData.strength}
                 onChange={handleChange}
                 placeholder="e.g. 500mg, 125mg/5ml"
-                className={`w-full h-9 px-3 text-xs font-bold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
+                className={`w-full h-8 px-2.5 text-xs font-bold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
                   errors.strength
-                    ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-200 bg-rose-50/20'
+                    ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20'
                     : 'border-slate-300 hover:border-blue-400 focus:border-blue-600 focus:ring-blue-600/30'
                 }`}
               />
@@ -452,7 +471,7 @@ export const MedicineForm = ({
               )}
             </div>
 
-            {/* Category */}
+            {/* Category (Pure Select Dropdown) */}
             <div>
               <label className="block text-xs font-bold text-black mb-1">
                 Therapeutic Category <span className="text-rose-600">*</span>
@@ -461,23 +480,30 @@ export const MedicineForm = ({
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
-                className="w-full h-9 px-3 text-xs font-bold bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-black focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600/30 cursor-pointer transition-all"
+                className={`w-full h-8 px-2.5 text-xs font-bold bg-white hover:bg-slate-50 border rounded-lg text-black focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600/30 cursor-pointer transition-all ${
+                  errors.category
+                    ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20'
+                    : 'border-slate-300'
+                }`}
               >
-                {categories.map((c, idx) => (
+                {combinedCategories.map((c, idx) => (
                   <option key={idx} value={c}>
                     {c}
                   </option>
                 ))}
               </select>
+              {errors.category && (
+                <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" /> {errors.category}
+                </p>
+              )}
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Manufacturer */}
             <div>
               <label className="flex items-center gap-1 text-xs font-bold text-black mb-1">
                 <Building2 className="w-3 h-3 text-blue-600" />
-                <span>Pharmaceutical Manufacturer</span>
+                <span>Manufacturer</span>
                 <span className="text-rose-600">*</span>
               </label>
               <input
@@ -485,10 +511,10 @@ export const MedicineForm = ({
                 name="manufacturer"
                 value={formData.manufacturer}
                 onChange={handleChange}
-                placeholder="e.g. GSK Pakistan, Abbott Laboratories"
-                className={`w-full h-9 px-3 text-xs font-semibold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
+                placeholder="e.g. GSK, Abbott"
+                className={`w-full h-8 px-2.5 text-xs font-semibold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
                   errors.manufacturer
-                    ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-200 bg-rose-50/20'
+                    ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20'
                     : 'border-slate-300 hover:border-blue-400 focus:border-blue-600 focus:ring-blue-600/30'
                 }`}
               />
@@ -498,16 +524,41 @@ export const MedicineForm = ({
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* Chemical Formula */}
+            <div className="sm:col-span-2">
+              <label className="flex items-center gap-1 text-xs font-bold text-black mb-1">
+                <Stethoscope className="w-3 h-3 text-purple-600" />
+                <span>Chemical Formula / Composition</span>
+                <span className="text-rose-600">*</span>
+              </label>
+              <input
+                type="text"
+                name="formula"
+                value={formData.formula}
+                onChange={handleChange}
+                placeholder="e.g. Amoxicillin trihydrate 125mg / 5ml"
+                className={`w-full h-8 px-2.5 text-xs font-mono font-bold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
+                  errors.formula
+                    ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20'
+                    : 'border-slate-300 hover:border-purple-400 focus:border-purple-600 focus:ring-purple-600/30'
+                }`}
+              />
+              {errors.formula && (
+                <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" /> {errors.formula}
+                </p>
+              )}
+            </div>
 
             {/* Min Stock Alert */}
             <div>
               <label className="flex items-center justify-between text-xs font-bold text-black mb-1">
                 <span className="flex items-center gap-1">
                   <AlertTriangle className="w-3 h-3 text-amber-500" />
-                  <span>Low Stock Alert Limit</span>
-                </span>
-                <span className="text-[11px] text-black font-bold bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                  {formData.minStockAlert || '20'} units threshold
+                  <span>Low Stock Alert</span>
                 </span>
               </label>
               <input
@@ -516,84 +567,37 @@ export const MedicineForm = ({
                 min="1"
                 value={formData.minStockAlert}
                 onChange={handleChange}
-                placeholder="e.g. 20"
-                className="w-full h-9 px-3 text-xs font-bold bg-white border border-slate-300 hover:border-blue-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600/30 rounded-lg text-black transition-all"
+                placeholder="20"
+                className="w-full h-8 px-2.5 text-xs font-bold bg-white border border-slate-300 hover:border-blue-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600/30 rounded-lg text-black transition-all"
               />
             </div>
           </div>
         </div>
 
         {/* ========================================================
-            CARD 3: CHEMICAL FORMULA & CLINICAL GUIDANCE (PURPLE THEME)
+            CARD 3: CLINICAL NOTES (OPTIONAL COMPACT)
             ======================================================== */}
-        <div className="p-3.5 sm:p-4 rounded-xl border border-purple-200/90 bg-gradient-to-br from-purple-50/50 via-white to-fuchsia-50/20 shadow-2xs space-y-3 transition-all">
-          <div className="flex items-center justify-between pb-1.5 border-b border-purple-100">
-            <div className="flex items-center gap-2">
-              <span className="bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white p-1 rounded-md shadow-2xs">
-                <FileText className="w-3.5 h-3.5" />
-              </span>
-              <div>
-                <h3 className="text-xs font-bold text-black uppercase tracking-wider">
-                  Chemical Formula & Clinical Notes
-                </h3>
-                <p className="text-[11px] text-neutral-800 font-medium">
-                  Active pharmaceutical ingredients, molecular ratio, and usage guidelines
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Chemical Formula */}
-          <div>
-            <label className="flex items-center gap-1 text-xs font-bold text-black mb-1">
-              <Stethoscope className="w-3 h-3 text-purple-600" />
-              <span>Active Chemical Composition Formula</span>
-              <span className="text-rose-600">*</span>
-            </label>
-            <input
-              type="text"
-              name="formula"
-              value={formData.formula}
-              onChange={handleChange}
-              placeholder="e.g. Amoxicillin trihydrate equivalent to 125mg amoxicillin per 5ml"
-              className={`w-full h-9 px-3 text-xs font-mono font-bold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
-                errors.formula
-                  ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-200 bg-rose-50/20'
-                  : 'border-slate-300 hover:border-purple-400 focus:border-purple-600 focus:ring-purple-600/30'
-              }`}
-            />
-            {errors.formula ? (
-              <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3 shrink-0" /> {errors.formula}
-              </p>
-            ) : (
-              <span className="text-[11px] text-neutral-700 font-medium mt-1 block">
-                Precise pharmacological salt and active moiety concentration
-              </span>
-            )}
-          </div>
-
-          {/* Clinical Indications & Usage */}
-          <div>
-            <label className="block text-xs font-bold text-black mb-1">
-              Therapeutic Indications & Clinical Notes
-            </label>
-            <textarea
-              name="usage"
-              rows={2}
-              value={formData.usage}
-              onChange={handleChange}
-              placeholder="e.g. Pediatric bacterial infections of ear, nose, throat, and respiratory tract..."
-              className="w-full p-2.5 text-xs font-medium bg-white border border-slate-300 hover:border-purple-400 rounded-lg text-black focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600/30 resize-none transition-all"
-            />
-          </div>
+        <div className="p-2.5 sm:p-3 rounded-xl border border-purple-200/80 bg-gradient-to-br from-purple-50/30 via-white to-fuchsia-50/10 shadow-2xs space-y-1.5">
+          <label className="flex items-center gap-1 text-xs font-bold text-black">
+            <FileText className="w-3 h-3 text-purple-600" />
+            <span>Therapeutic Indications & Clinical Notes</span>
+            <span className="text-[10px] text-slate-500 font-normal">(Optional)</span>
+          </label>
+          <textarea
+            name="usage"
+            rows={1}
+            value={formData.usage}
+            onChange={handleChange}
+            placeholder="e.g. Bacterial infections, pain relief, usage precautions..."
+            className="w-full p-2 text-xs font-medium bg-white border border-slate-300 hover:border-purple-400 rounded-lg text-black focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600/30 resize-none transition-all"
+          />
         </div>
 
         {/* ========================================================
-            CARD 4: INITIAL STOCK BATCH (AMBER / ORANGE THEME - NEW ONLY)
+            CARD 4: INITIAL STOCK BATCH (MANDATORY FOR NEW MEDICINE)
             ======================================================== */}
         {!isEditing && (
-          <div className="p-3.5 sm:p-4 rounded-xl border border-amber-200/90 bg-gradient-to-br from-amber-50/60 via-white to-orange-50/20 shadow-2xs space-y-3 transition-all">
+          <div className="p-3 sm:p-3.5 rounded-xl border border-amber-200/90 bg-gradient-to-br from-amber-50/50 via-white to-orange-50/20 shadow-2xs space-y-3">
             <div className="flex items-center justify-between pb-1.5 border-b border-amber-200/80">
               <div className="flex items-center gap-2">
                 <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-1 rounded-md shadow-2xs">
@@ -603,132 +607,224 @@ export const MedicineForm = ({
                   <h4 className="text-xs font-bold uppercase tracking-wider text-black">
                     Register Initial Stock Batch
                   </h4>
+                </div>
+              </div>
+
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-emerald-100 text-emerald-900 border-emerald-300">
+                Mandatory First Batch
+              </span>
+            </div>
+
+            {/* Row 1: Identification & Pricing */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div>
+                <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
+                  <Hash className="w-3 h-3 text-amber-600" />
+                  <span>Batch Code *</span>
+                </label>
+                <input
+                  type="text"
+                  name="batchNo"
+                  value={formData.batchNo}
+                  onChange={handleChange}
+                  placeholder="e.g. BAT-1001"
+                  className={`w-full h-8 px-2.5 text-xs font-mono font-bold bg-white border ${
+                    errors.batchNo ? 'border-red-500 bg-red-50/20' : 'border-amber-300'
+                  } rounded-lg text-black focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600/30`}
+                />
+                {errors.batchNo && (
+                  <p className="text-[10px] text-red-600 font-semibold mt-0.5">{errors.batchNo}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
+                  <PackageCheck className="w-3 h-3 text-amber-600" />
+                  <span>Initial Quantity *</span>
+                </label>
+                <input
+                  type="number"
+                  name="initialQuantity"
+                  min="0"
+                  value={formData.initialQuantity}
+                  onChange={handleChange}
+                  placeholder="50"
+                  className={`w-full h-8 px-2.5 text-xs font-bold bg-white border ${
+                    errors.initialQuantity ? 'border-red-500 bg-red-50/20' : 'border-amber-300'
+                  } rounded-lg text-black focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600/30`}
+                />
+                {errors.initialQuantity && (
+                  <p className="text-[10px] text-red-600 font-semibold mt-0.5">
+                    {errors.initialQuantity}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
+                  <DollarSign className="w-3 h-3 text-neutral-600" />
+                  <span>Cost Price (Rs.) *</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="purchasePrice"
+                  value={formData.purchasePrice}
+                  onChange={handleChange}
+                  placeholder="20.00"
+                  className={`w-full h-8 px-2.5 text-xs font-bold bg-white border ${
+                    errors.purchasePrice ? 'border-red-500 bg-red-50/20' : 'border-slate-300'
+                  } rounded-lg text-black focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600/30`}
+                />
+                {errors.purchasePrice && (
+                  <p className="text-[10px] text-red-600 font-semibold mt-0.5">
+                    {errors.purchasePrice}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
+                  <DollarSign className="w-3 h-3 text-emerald-600" />
+                  <span>Selling Price (Rs.) *</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="sellingPrice"
+                  value={formData.sellingPrice}
+                  onChange={handleChange}
+                  placeholder="30.00"
+                  className={`w-full h-8 px-2.5 text-xs font-bold text-emerald-800 bg-emerald-50/70 border ${
+                    errors.sellingPrice ? 'border-red-500 bg-red-50/20' : 'border-emerald-300'
+                  } rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/30`}
+                />
+                {errors.sellingPrice && (
+                  <p className="text-[10px] text-red-600 font-semibold mt-0.5">
+                    {errors.sellingPrice}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Row 2: VALIDITY DATES & STORAGE SHELF (Exact match of Image 1) */}
+            <div className="pt-2.5 border-t border-amber-200/80 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-1 rounded-md shadow-2xs">
+                  <Calendar className="w-3.5 h-3.5" />
+                </span>
+                <div>
+                  <h5 className="text-xs font-bold text-black uppercase tracking-wider">
+                    Validity Dates & Storage Shelf
+                  </h5>
                   <p className="text-[11px] text-neutral-800 font-medium">
-                    Optionally add your first incoming physical batch immediately.
+                    Manufacturing date, expiry threshold, and physical rack assignment
                   </p>
                 </div>
               </div>
 
-              {/* Toggle Switch */}
-              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={showInitialBatch}
-                  onChange={(e) => setShowInitialBatch(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="relative w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600 shadow-inner"></div>
-                <span
-                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full border transition-colors ${
-                    showInitialBatch
-                      ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                      : 'bg-slate-100 text-black border-slate-300'
-                  }`}
-                >
-                  {showInitialBatch ? 'Enabled' : 'Skip Batch'}
-                </span>
-              </label>
-            </div>
-
-            {showInitialBatch && (
-              <div className="pt-1.5 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
-                      <Hash className="w-3 h-3 text-amber-600" />
-                      <span>Batch Code</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="batchNo"
-                      value={formData.batchNo}
-                      onChange={handleChange}
-                      placeholder="e.g. BAT-1001"
-                      className="w-full h-8 px-2.5 text-xs font-mono font-bold bg-white border border-amber-300 rounded-lg text-black focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600/30"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
-                      <PackageCheck className="w-3 h-3 text-amber-600" />
-                      <span>Initial Quantity</span>
-                    </label>
-                    <input
-                      type="number"
-                      name="initialQuantity"
-                      min="0"
-                      value={formData.initialQuantity}
-                      onChange={handleChange}
-                      placeholder="50"
-                      className="w-full h-8 px-2.5 text-xs font-bold bg-white border border-amber-300 rounded-lg text-black focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600/30"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
-                      <MapPin className="w-3 h-3 text-amber-600" />
-                      <span>Storage Location</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleChange}
-                      placeholder="e.g. Rack A-1, Shelf 2"
-                      className="w-full h-8 px-2.5 text-xs font-semibold bg-white border border-amber-300 rounded-lg text-black focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600/30"
-                    />
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Manufacturing Date */}
+                <div>
+                  <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
+                    <Calendar className="w-3 h-3 text-amber-600" />
+                    <span>Manufacturing Date</span>
+                    <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="manufacturingDate"
+                    value={formData.manufacturingDate}
+                    onChange={handleChange}
+                    className={`w-full h-8 px-2.5 text-xs font-bold bg-white border ${
+                      errors.manufacturingDate ? 'border-red-500 bg-red-50/20' : 'border-amber-300'
+                    } rounded-lg text-black focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600/30 cursor-pointer`}
+                  />
+                  {errors.manufacturingDate && (
+                    <p className="text-[10px] text-red-600 font-semibold mt-0.5">
+                      {errors.manufacturingDate}
+                    </p>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
-                      <DollarSign className="w-3 h-3 text-neutral-600" />
-                      <span>Cost Price (Rs.)</span>
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      name="purchasePrice"
-                      value={formData.purchasePrice}
-                      onChange={handleChange}
-                      placeholder="20.00"
-                      className="w-full h-8 px-2.5 text-xs font-bold bg-white border border-slate-300 rounded-lg text-black focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600/30"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
-                      <DollarSign className="w-3 h-3 text-emerald-600" />
-                      <span>Selling Retail Price (Rs.)</span>
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      name="sellingPrice"
-                      value={formData.sellingPrice}
-                      onChange={handleChange}
-                      placeholder="30.00"
-                      className="w-full h-8 px-2.5 text-xs font-bold text-emerald-800 bg-emerald-50/70 border border-emerald-300 rounded-lg focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/30"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
-                      <Calendar className="w-3 h-3 text-amber-600" />
-                      <span>Batch Expiry Date</span>
-                    </label>
-                    <input
-                      type="date"
-                      name="expiryDate"
-                      value={formData.expiryDate}
-                      onChange={handleChange}
-                      className="w-full h-8 px-2.5 text-xs font-bold bg-white border border-amber-300 rounded-lg text-black focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600/30 cursor-pointer"
-                    />
-                  </div>
+                {/* Batch Expiry Date */}
+                <div>
+                  <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
+                    <Calendar className="w-3 h-3 text-amber-600" />
+                    <span>Batch Expiry Date</span>
+                    <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="expiryDate"
+                    value={formData.expiryDate}
+                    onChange={handleChange}
+                    className={`w-full h-8 px-2.5 text-xs font-bold bg-white border ${
+                      errors.expiryDate ? 'border-red-500 bg-red-50/20' : 'border-amber-300'
+                    } rounded-lg text-black focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600/30 cursor-pointer`}
+                  />
+                  {errors.expiryDate ? (
+                    <p className="text-[10px] text-red-600 font-semibold mt-0.5">
+                      {errors.expiryDate}
+                    </p>
+                  ) : (
+                    <span className="text-[10px] text-neutral-600 font-medium mt-0.5 block">
+                      Must be after manufacturing date
+                    </span>
+                  )}
                 </div>
               </div>
-            )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Storage Rack */}
+                <div>
+                  <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
+                    <MapPin className="w-3 h-3 text-purple-600" />
+                    <span>Storage Rack</span>
+                    <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="rack"
+                    value={formData.rack}
+                    onChange={handleChange}
+                    placeholder="Rack A-1"
+                    className={`w-full h-8 px-2.5 text-xs font-bold bg-white border ${
+                      errors.rack ? 'border-red-500 bg-red-50/20' : 'border-slate-300'
+                    } rounded-lg text-black focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600/30`}
+                  />
+                  {errors.rack && (
+                    <p className="text-[10px] text-red-600 font-semibold mt-0.5">
+                      {errors.rack}
+                    </p>
+                  )}
+                </div>
+
+                {/* Storage Shelf / Bin */}
+                <div>
+                  <label className="flex items-center gap-1 text-[11px] font-bold text-black mb-1">
+                    <MapPin className="w-3 h-3 text-purple-600" />
+                    <span>Storage Shelf / Bin</span>
+                    <span className="text-rose-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="shelf"
+                    value={formData.shelf}
+                    onChange={handleChange}
+                    placeholder="Shelf 1"
+                    className={`w-full h-8 px-2.5 text-xs font-bold bg-white border ${
+                      errors.shelf ? 'border-red-500 bg-red-50/20' : 'border-slate-300'
+                    } rounded-lg text-black focus:outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-600/30`}
+                  />
+                  {errors.shelf && (
+                    <p className="text-[10px] text-red-600 font-semibold mt-0.5">
+                      {errors.shelf}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </form>

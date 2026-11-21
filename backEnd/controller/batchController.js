@@ -299,29 +299,71 @@ const createBatch = asyncHandler(async (req, res) => {
   // Resolve parent medicine (accepts ObjectId or string code like MED-1001)
   const isObjectId = mongoose.Types.ObjectId.isValid(medicineId);
   const medQuery = isObjectId ? { $or: [{ _id: medicineId }, { medicineId }] } : { medicineId };
-  const medicine = await Medicine.findOne(medQuery);
+  let medicine = await Medicine.findOne(medQuery);
 
-  if (!medicine) {
-    return ApiResponse.error(
-      res,
-      `Parent medicine '${medicineId}' does not exist.`,
-      ['Invalid medicine reference'],
-      404
-    );
+  if (!medicine && req.body.medicineCode) {
+    medicine = await Medicine.findOne({ medicineId: req.body.medicineCode });
   }
 
-  // Business Rule: Prevent duplicate batch records within the same medicine
+  // If medicine doesn't exist in DB, create it automatically so the batch is always stored
+  if (!medicine) {
+    const medCode =
+      req.body.medicineCode ||
+      (String(medicineId).startsWith('MED-')
+        ? medicineId
+        : `MED-${Math.floor(1000 + Math.random() * 9000)}`);
+    const medName = req.body.medicineName || req.body.name || `Medicine ${medCode}`;
+    medicine = await Medicine.create({
+      medicineId: medCode,
+      name: medName,
+      genericName: req.body.genericName || medName,
+      brand: req.body.brand || medName,
+      type: req.body.type || 'Tablet',
+      category: req.body.category || 'General',
+      formula: req.body.formula || 'Standard Formulation',
+      strength: req.body.strength || '500mg',
+      sellingPrice: req.body.sellingPrice || 0,
+      purchasePrice: req.body.purchasePrice || 0,
+      createdBy: req.user?._id || null,
+      updatedBy: req.user?._id || null,
+    });
+  }
+
+  const pPrice = purchasePrice !== undefined ? Number(purchasePrice) : medicine.purchasePrice || 0;
+  const sPrice = sellingPrice !== undefined ? Number(sellingPrice) : medicine.sellingPrice || 0;
+  const qty = Math.max(0, Number(quantity));
+
+  // Business Rule: If batch with same batchNumber already exists for medicine, update its stock
   const existing = await Batch.findOne({
     medicineId: medicine._id,
     batchNumber: batchNumber.trim(),
   });
   if (existing) {
-    return ApiResponse.error(
-      res,
-      `Batch number '${batchNumber}' already exists for medicine '${medicine.name}'.`,
-      ['Duplicate batchNumber for medicine'],
-      409
-    );
+    existing.quantity += qty;
+    if (purchasePrice !== undefined) existing.purchasePrice = pPrice;
+    if (sellingPrice !== undefined) existing.sellingPrice = sPrice;
+    if (rack) existing.rack = rack.trim();
+    if (shelf) existing.shelf = shelf.trim();
+    if (exp) existing.expiryDate = exp;
+    if (mfg) existing.manufacturingDate = mfg;
+    existing.updatedBy = req.user?._id || null;
+    await existing.save();
+
+    await StockHistory.create({
+      stockHistoryId: `HIST-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      medicineId: medicine.medicineId,
+      batchId: existing.batchId,
+      previousQuantity: existing.quantity - qty,
+      changedQuantity: qty,
+      newQuantity: existing.quantity,
+      actionType: 'Add Stock',
+      employeeId: req.user?.username || 'STAFF-01',
+      employeeName: req.user?.name || 'Staff Pharmacist',
+      reason: req.body.reason?.trim() || `Added stock to existing batch (${existing.batchNumber})`,
+    });
+
+    await existing.populate('medicineId', 'name genericName brand formula strength type category medicineId minStockAlert');
+    return ApiResponse.success(res, `Batch '${existing.batchNumber}' stock updated successfully`, enrichBatch(existing));
   }
 
   // Generate unique batchId e.g. BAT-1006
@@ -329,15 +371,11 @@ const createBatch = asyncHandler(async (req, res) => {
   let batchId = req.body.batchId;
   if (!batchId) {
     batchId = `BAT-${1001 + count}`;
-    let exists = await Batch.findOne({ batchId });
-    if (exists) {
-      batchId = `BAT-${1001 + count}-${Date.now().toString().slice(-4)}`;
-    }
   }
-
-  const pPrice = purchasePrice !== undefined ? Number(purchasePrice) : medicine.purchasePrice;
-  const sPrice = sellingPrice !== undefined ? Number(sellingPrice) : medicine.sellingPrice;
-  const qty = Math.max(0, Number(quantity));
+  let exists = await Batch.findOne({ batchId });
+  if (exists) {
+    batchId = `BAT-${Math.floor(1000 + Math.random() * 9000)}-${Date.now().toString().slice(-4)}`;
+  }
 
   const batch = await Batch.create({
     batchId,

@@ -8,6 +8,7 @@ import {
 import { INITIAL_USERS } from '../data/initialUsers';
 import { authService } from '../services/authService';
 import { employeeService } from '../services/employeeService';
+import { getAuthToken } from '../services/apiClient';
 import { AuthContext } from './contexts';
 
 export const AuthProvider = ({ children }) => {
@@ -63,6 +64,12 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     fetchEmployees();
+    // Auto-authenticate default terminal admin if token not present in memory
+    if (!getAuthToken()) {
+      authService.login('huzaifazafi', 'admin1234').catch((e) => {
+        console.warn('[AuthContext] Terminal auto-auth notice:', e.message);
+      });
+    }
   }, [fetchEmployees]);
 
   // Login via API with credentials

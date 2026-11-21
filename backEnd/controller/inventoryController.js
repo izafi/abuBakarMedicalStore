@@ -480,15 +480,15 @@ const removeStock = asyncHandler(async (req, res) => {
  * @access  Private ('inventory.edit')
  */
 const updateStock = asyncHandler(async (req, res) => {
-  const { batchId, newQuantity, reason } = req.body;
+  const { batchId, newQuantity, delta, quantity, reason } = req.body;
 
-  if (!batchId || newQuantity === undefined) {
-    return ApiResponse.error(res, 'batchId and newQuantity are required', ['Missing fields'], 400);
-  }
-
-  const targetQty = Number(newQuantity);
-  if (isNaN(targetQty) || targetQty < 0) {
-    return ApiResponse.error(res, 'newQuantity cannot be negative.', ['Negative stock forbidden'], 400);
+  if (!batchId || (newQuantity === undefined && delta === undefined && quantity === undefined)) {
+    return ApiResponse.error(
+      res,
+      'batchId and either newQuantity or delta are required',
+      ['Missing fields'],
+      400
+    );
   }
 
   const result = await runInTransaction(async (session) => {
@@ -502,8 +502,26 @@ const updateStock = asyncHandler(async (req, res) => {
       throw error;
     }
 
-    const previousQuantity = batch.quantity;
-    const changedQuantity = targetQty - previousQuantity;
+    const previousQuantity = Number(batch.quantity) || 0;
+    let targetQty;
+    let changedQuantity;
+
+    if (newQuantity !== undefined) {
+      targetQty = Number(newQuantity);
+      changedQuantity = targetQty - previousQuantity;
+    } else if (delta !== undefined) {
+      changedQuantity = Number(delta);
+      targetQty = previousQuantity + changedQuantity;
+    } else {
+      targetQty = Number(quantity);
+      changedQuantity = targetQty - previousQuantity;
+    }
+
+    if (isNaN(targetQty) || targetQty < 0) {
+      const error = new Error('Stock quantity cannot be negative.');
+      error.statusCode = 400;
+      throw error;
+    }
 
     batch.quantity = targetQty;
     batch.updatedBy = req.user?._id || null;
@@ -519,7 +537,7 @@ const updateStock = asyncHandler(async (req, res) => {
           previousQuantity,
           changedQuantity,
           newQuantity: targetQty,
-          actionType: 'UPDATE',
+          actionType: changedQuantity >= 0 ? 'ADD' : 'REMOVE',
           employeeId: req.user?.username || req.user?.name || 'STAFF-01',
           employeeName: req.user?.name || 'Staff Pharmacist',
           reason: reason?.trim() || `Manual stock audit correction (${previousQuantity} -> ${targetQty})`,
@@ -529,15 +547,15 @@ const updateStock = asyncHandler(async (req, res) => {
       { session: session || null }
     );
 
-    return { batch, history: historyEntry[0] };
+    return { batch, history: historyEntry[0], targetQty };
   });
 
-  return ApiResponse.success(res, `Successfully updated stock for batch '${result.batch.batchNumber}' to ${targetQty}.`, {
+  return ApiResponse.success(res, `Successfully updated stock for batch '${result.batch.batchNumber}' to ${result.batch.quantity}.`, {
     batchId: result.batch.batchId,
     batchNumber: result.batch.batchNumber,
     previousQuantity: result.history.previousQuantity,
     changedQuantity: result.history.changedQuantity,
-    newQuantity: targetQty,
+    newQuantity: result.batch.quantity,
     history: result.history,
   });
 });

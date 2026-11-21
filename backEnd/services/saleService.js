@@ -79,17 +79,11 @@ const processSale = async ({ saleData, user }) => {
     idempotencyKey,
   } = saleData;
 
-  // 1. Patient & Prescription Validation
-  const finalPatient = (patientName || saleData.customerName || '').trim();
-  const finalDoctor = (doctorName || '').trim();
-  const finalPrescription = (prescription || prescriptionDescription || '').trim();
-  const finalPrescriptionRef = (prescriptionRef || prescriptionReferenceNumber || 'N/A').trim();
-
-  if (!finalPatient || !finalDoctor || !finalPrescription) {
-    const error = new Error('Patient name, doctor name, and prescription description are required.');
-    error.statusCode = 400;
-    throw error;
-  }
+  // 1. Patient & Prescription Normalization (Optional)
+  const finalPatient = (patientName || saleData.customerName || '').trim() || 'Walk-in Customer';
+  const finalDoctor = (doctorName || '').trim() || 'Self / Counter';
+  const finalPrescription = (prescription || prescriptionDescription || '').trim() || 'Counter dispensing';
+  const finalPrescriptionRef = (prescriptionRef || prescriptionReferenceNumber || 'N/A').trim() || 'N/A';
 
   // 2. Payment Method Validation & Normalization
   let normalizedPaymentMethod = 'Cash';

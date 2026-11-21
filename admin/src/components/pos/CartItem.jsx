@@ -1,6 +1,9 @@
-import { Trash2, Clock, Layers } from 'lucide-react';
+import { useState } from 'react';
+import { Trash2, Clock, Layers, Percent, Check } from 'lucide-react';
 import { QuantityControl } from './QuantityControl';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+
+const PRESET_DISCOUNTS = [0, 5, 10, 15];
 
 export const CartItem = ({
   item,
@@ -14,6 +17,45 @@ export const CartItem = ({
   const validBatches = availableBatches.filter(
     (b) => b.medicineId === item.medicineId && b.canSell && b.quantity > 0
   );
+
+  const isPreset = PRESET_DISCOUNTS.includes(item.discountPercentage);
+  const isCustomActive = !isPreset && item.discountPercentage > 0;
+
+  const [isCustomOpen, setIsCustomOpen] = useState(false);
+  const [customUnit, setCustomUnit] = useState('%'); // '%' | 'Rs'
+  const [customValue, setCustomValue] = useState('');
+
+  const handleCustomValueChange = (e) => {
+    const valStr = e.target.value;
+    setCustomValue(valStr);
+    const num = parseFloat(valStr);
+    if (valStr === '' || isNaN(num) || num < 0) {
+      onDiscountChange(item.cartItemId, 0);
+    } else if (customUnit === '%') {
+      const safePct = Math.min(100, Math.max(0, num));
+      onDiscountChange(item.cartItemId, safePct);
+    } else {
+      const safeAmt = Math.min(item.subtotal, Math.max(0, num));
+      onDiscountChange(item.cartItemId, null, safeAmt);
+    }
+  };
+
+  const handleUnitSwitch = (newUnit) => {
+    setCustomUnit(newUnit);
+    if (newUnit === '%') {
+      const currentPct = item.discountPercentage || 0;
+      setCustomValue(currentPct > 0 ? String(currentPct) : '');
+      if (currentPct > 0) {
+        onDiscountChange(item.cartItemId, currentPct);
+      }
+    } else {
+      const currentAmt = item.discountAmount || 0;
+      setCustomValue(currentAmt > 0 ? String(currentAmt) : '');
+      if (currentAmt > 0) {
+        onDiscountChange(item.cartItemId, null, currentAmt);
+      }
+    }
+  };
 
   return (
     <div className="p-3.5 bg-white rounded-xl border border-slate-200/90 shadow-xs space-y-2.5 hover:border-[#1C9A58]/50 transition-all">
@@ -118,13 +160,17 @@ export const CartItem = ({
             Disc:
           </span>
           <div className="flex items-center gap-1 flex-wrap">
-            {[0, 5, 10, 15].map((pct) => (
+            {PRESET_DISCOUNTS.map((pct) => (
               <button
                 key={pct}
                 type="button"
-                onClick={() => onDiscountChange(item.cartItemId, pct)}
+                onClick={() => {
+                  setIsCustomOpen(false);
+                  setCustomValue('');
+                  onDiscountChange(item.cartItemId, pct);
+                }}
                 className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                  item.discountPercentage === pct
+                  isPreset && item.discountPercentage === pct
                     ? pct === 0
                       ? 'bg-slate-300 text-black font-extrabold shadow-xs'
                       : 'bg-[#1C9A58] text-white shadow-xs'
@@ -134,9 +180,114 @@ export const CartItem = ({
                 {pct === 0 ? 'None' : `${pct}%`}
               </button>
             ))}
+
+            {/* Custom Discount Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const nextState = !isCustomOpen;
+                setIsCustomOpen(nextState);
+                if (nextState) {
+                  if (customUnit === 'Rs') {
+                    setCustomValue(item.discountAmount > 0 ? String(item.discountAmount) : '');
+                  } else {
+                    setCustomValue(
+                      item.discountPercentage > 0 && !isPreset
+                        ? String(item.discountPercentage)
+                        : ''
+                    );
+                  }
+                }
+              }}
+              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                isCustomActive
+                  ? 'bg-[#1C9A58] text-white shadow-xs'
+                  : isCustomOpen
+                  ? 'bg-emerald-100 text-[#1C9A58] border border-[#1C9A58] font-extrabold'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+              }`}
+              title="Add custom discount (% or Rs)"
+            >
+              <span>
+                {isCustomActive
+                  ? customUnit === 'Rs'
+                    ? `Rs. ${item.discountAmount}`
+                    : `${item.discountPercentage}%`
+                  : 'Custom'}
+              </span>
+            </button>
           </div>
         </div>
       </div>
+
+      {/* 4. Collapsible Custom Discount Drawer */}
+      {isCustomOpen && (
+        <div className="w-full pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-200/90">
+          <div className="flex items-center gap-2 flex-wrap min-w-[200px]">
+            <span className="text-xs font-bold text-black">
+              Custom Discount:
+            </span>
+            <div className="relative flex items-center">
+              <input
+                type="number"
+                min="0"
+                max={customUnit === '%' ? 100 : item.subtotal}
+                step="any"
+                value={customValue}
+                onChange={handleCustomValueChange}
+                placeholder={customUnit === '%' ? 'e.g. 12' : `e.g. 25 (max ${item.subtotal})`}
+                autoFocus
+                className="w-24 h-7 px-2 text-xs font-bold font-mono bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1C9A58]/30 focus:border-[#1C9A58] text-black shadow-2xs"
+              />
+            </div>
+
+            {/* % vs Rs Toggle */}
+            <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => handleUnitSwitch('%')}
+                className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer transition-colors ${
+                  customUnit === '%'
+                    ? 'bg-[#1C9A58] text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-black'
+                }`}
+                title="Discount as Percentage"
+              >
+                %
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUnitSwitch('Rs')}
+                className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer transition-colors ${
+                  customUnit === 'Rs'
+                    ? 'bg-[#1C9A58] text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-black'
+                }`}
+                title="Discount as Flat Rupees"
+              >
+                Rs.
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {item.discountAmount > 0 && (
+              <span className="text-xs font-bold font-mono text-emerald-800 bg-white/80 px-2 py-0.5 rounded border border-emerald-200">
+                Discount: -{formatCurrency(item.discountAmount)} ({item.discountPercentage}%)
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsCustomOpen(false)}
+              className="px-2.5 py-1 text-xs font-bold text-white bg-[#1C9A58] hover:bg-[#158046] rounded-md transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
+              title="Apply & Close"
+            >
+              <Check className="w-3.5 h-3.5 stroke-[3]" />
+              <span>Apply</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

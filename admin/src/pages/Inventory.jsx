@@ -124,13 +124,13 @@ export const Inventory = () => {
   }, [batches, searchQuery, stockStatusFilter, expiryFilter]);
 
   // Batch Save Handler
-  const handleSaveBatch = (batchData, reason) => {
+  const handleSaveBatch = async (batchData, reason) => {
     try {
       if (editingBatch) {
-        updateBatch(editingBatch.batchId || editingBatch.id, batchData, reason);
+        await updateBatch(editingBatch.batchId || editingBatch.id, batchData, reason);
         toast.showSuccess(`Batch ${batchData.batchNumber} updated successfully.`);
       } else {
-        addBatch(batchData, reason);
+        await addBatch(batchData, reason);
         toast.showSuccess(`Batch ${batchData.batchNumber} registered to inventory.`);
       }
       setIsBatchFormOpen(false);
@@ -140,10 +140,10 @@ export const Inventory = () => {
     }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      deleteBatch(deleteTarget.batchId || deleteTarget.id, 'Batch permanently discarded');
+      await deleteBatch(deleteTarget.batchId || deleteTarget.id, 'Batch permanently discarded');
       toast.showSuccess(`Batch ${deleteTarget.batchNumber} removed from inventory.`);
       setDeleteTarget(null);
     } catch (err) {
@@ -151,9 +151,9 @@ export const Inventory = () => {
     }
   };
 
-  const handleApplyAdjustment = ({ batchId, delta, actionType, reason }) => {
+  const handleApplyAdjustment = async ({ batchId, delta, actionType, reason }) => {
     try {
-      adjustBatchStock(batchId, delta, actionType, reason);
+      await adjustBatchStock(batchId, delta, actionType, reason);
       toast.showSuccess(
         `Stock successfully ${delta > 0 ? 'increased' : 'reduced'} by ${Math.abs(delta)} units.`
       );

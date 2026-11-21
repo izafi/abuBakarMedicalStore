@@ -71,12 +71,28 @@ export const MedicinesManagement = () => {
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
-        med.name.toLowerCase().includes(q) ||
-        med.genericName.toLowerCase().includes(q) ||
-        (med.brand && med.brand.toLowerCase().includes(q)) ||
-        (med.formula && med.formula.toLowerCase().includes(q)) ||
-        (med.manufacturer && med.manufacturer.toLowerCase().includes(q)) ||
-        med.medicineId.toLowerCase().includes(q);
+        med.name?.toLowerCase().includes(q) ||
+        med.genericName?.toLowerCase().includes(q) ||
+        med.brand?.toLowerCase().includes(q) ||
+        med.category?.toLowerCase().includes(q) ||
+        med.formula?.toLowerCase().includes(q) ||
+        med.strength?.toLowerCase().includes(q) ||
+        med.type?.toLowerCase().includes(q) ||
+        med.manufacturer?.toLowerCase().includes(q) ||
+        med.medicineId?.toLowerCase().includes(q) ||
+        batches
+          .filter(
+            (b) =>
+              b.medicineId === med.medicineId ||
+              b.medicineCode === med.medicineId ||
+              b.medicineId === med.id ||
+              b.medicineId === med._id
+          )
+          .some(
+            (b) =>
+              b.batchNumber?.toLowerCase().includes(q) ||
+              b.batchNo?.toLowerCase().includes(q)
+          );
 
       const matchesCat =
         selectedCategory === 'All' || med.category === selectedCategory;
@@ -86,7 +102,7 @@ export const MedicinesManagement = () => {
 
       return matchesSearch && matchesCat && matchesType;
     });
-  }, [medicines, searchQuery, selectedCategory, selectedType]);
+  }, [medicines, batches, searchQuery, selectedCategory, selectedType]);
 
   // Handle Save (Add or Edit)
   const handleSaveMedicine = ({ medicineData, initialBatch }) => {
@@ -264,7 +280,7 @@ export const MedicinesManagement = () => {
             <SearchBar
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by brand name, generic formula, or Medicine ID..."
+              placeholder="Search by brand name, category, generic formula, or Medicine ID..."
               className="text-xs"
             />
           </div>
@@ -359,6 +375,7 @@ export const MedicinesManagement = () => {
           medicines={filteredMedicines}
           onViewDetails={(med) => setViewingMedicine(med)}
           onEdit={(med) => {
+            setViewingMedicine(null);
             setEditingMedicine(med);
             setIsFormOpen(true);
           }}
@@ -405,6 +422,7 @@ export const MedicinesManagement = () => {
           batches={batches.filter((b) => b.medicineId === viewingMedicine.medicineId)}
           allBatches={batches}
           onEdit={(med) => {
+            setViewingMedicine(null);
             setEditingMedicine(med);
             setIsFormOpen(true);
           }}

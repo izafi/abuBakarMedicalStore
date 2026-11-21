@@ -45,38 +45,24 @@ const checkoutSale = asyncHandler(async (req, res) => {
     );
   }
 
-  // STEP 1: PATIENT INFORMATION VALIDATION
-  const patientSource = req.body.patientInfo || req.body.patient || req.body;
-  const patientName = (patientSource.patientName || patientSource.customerName || req.body.patientName || '').trim();
-  const doctorName = (patientSource.doctorName || req.body.doctorName || '').trim();
+  // STEP 1: PATIENT INFORMATION (OPTIONAL)
+  const patientSource = req.body.patientInfo || req.body.patient || req.body || {};
+  const patientName = (patientSource.patientName || patientSource.customerName || req.body.patientName || '').trim() || 'Walk-in Customer';
+  const doctorName = (patientSource.doctorName || req.body.doctorName || '').trim() || 'Self / Counter';
   const prescription = (
     patientSource.prescription ||
     patientSource.prescriptionDescription ||
     req.body.prescription ||
     req.body.prescriptionDescription ||
     ''
-  ).trim();
+  ).trim() || 'Counter dispensing';
   const prescriptionRef = (
     patientSource.prescriptionRef ||
     patientSource.prescriptionReferenceNumber ||
     req.body.prescriptionRef ||
     req.body.prescriptionReferenceNumber ||
     'N/A'
-  ).trim();
-
-  const missingPatientFields = [];
-  if (!patientName) missingPatientFields.push('patientName is required');
-  if (!doctorName) missingPatientFields.push('doctorName is required');
-  if (!prescription) missingPatientFields.push('prescription description is required');
-
-  if (missingPatientFields.length > 0) {
-    return ApiResponse.error(
-      res,
-      'Patient information validation failed. Patient name, doctor name, and prescription description are required.',
-      missingPatientFields,
-      400
-    );
-  }
+  ).trim() || 'N/A';
 
   // STEP 2: EMPLOYEE PASSWORD VERIFICATION
   // Critical Security: Never trust client-sent verified=true flags or body employeeId.

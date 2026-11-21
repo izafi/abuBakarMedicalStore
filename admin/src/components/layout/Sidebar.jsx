@@ -16,6 +16,7 @@ import {
 import { APP_INFO, USER_ROLES } from '../../utils/constants';
 import { useInventory } from '../../hooks/useInventory';
 import { useAuth } from '../../hooks/useAuth';
+import { useSettings } from '../../hooks/useSettings';
 import { alert } from '../../utils/sweetAlert';
 
 export const Sidebar = ({
@@ -26,6 +27,7 @@ export const Sidebar = ({
 }) => {
   const { analytics } = useInventory();
   const { currentUser, logout, hasPermission } = useAuth();
+  const { settings } = useSettings();
 
   const handleLogout = async () => {
     const confirmed = await alert.confirm({
@@ -140,11 +142,17 @@ export const Sidebar = ({
           </div>
           {!isCollapsed && (
             <div className="min-w-0 flex-1">
-              <h1 className="font-extrabold text-[12.5px] sm:text-[13px] tracking-tight text-white whitespace-nowrap leading-none">
-                {APP_INFO.NAME}
+              <h1
+                className="font-extrabold text-[12.5px] sm:text-[13px] tracking-tight text-white whitespace-nowrap leading-none truncate"
+                title={settings?.storeName || APP_INFO.NAME}
+              >
+                {settings?.storeName || APP_INFO.NAME}
               </h1>
-              <p className="text-[9.5px] text-[#A3D9BE] font-bold tracking-wider uppercase truncate mt-1">
-                {APP_INFO.TAGLINE}
+              <p
+                className="text-[9.5px] text-[#A3D9BE] font-bold tracking-wider uppercase truncate mt-1"
+                title={settings?.tagline || APP_INFO.TAGLINE}
+              >
+                {settings?.tagline || APP_INFO.TAGLINE}
               </p>
             </div>
           )}

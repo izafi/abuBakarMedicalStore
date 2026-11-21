@@ -29,6 +29,7 @@ export const POS = () => {
     addToCart,
     updateCartQuantity,
     updateCartDiscount,
+    applyCartDiscountToAll,
     updateCartBatch,
     removeFromCart,
     clearCart,
@@ -347,6 +348,7 @@ export const POS = () => {
             onAmountReceivedChange={setAmountReceived}
             onQuantityChange={updateCartQuantity}
             onDiscountChange={updateCartDiscount}
+            onApplyCartDiscount={applyCartDiscountToAll}
             onBatchChange={updateCartBatch}
             onRemoveItem={removeFromCart}
             onClearCart={clearCart}

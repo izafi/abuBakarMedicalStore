@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { BATCH_STOCK_STATUS, STOCK_ACTION_TYPES } from '../utils/constants';
+import { BATCH_STOCK_STATUS, STOCK_ACTION_TYPES, DEFAULT_THERAPEUTIC_CATEGORIES } from '../utils/constants';
 import { getDaysUntilExpiry, getBatchStockStatus, canSellBatch } from '../utils/formatters';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../hooks/useSettings';
@@ -14,7 +14,7 @@ export const InventoryProvider = ({ children }) => {
 
   const [medicines, setMedicines] = useState([]);
   const [batches, setBatches] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(DEFAULT_THERAPEUTIC_CATEGORIES);
   const [stockHistory, setStockHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -48,9 +48,8 @@ export const InventoryProvider = ({ children }) => {
 
       if (catsRes.status === 'fulfilled' && catsRes.value?.data) {
         const rawCats = Array.isArray(catsRes.value.data) ? catsRes.value.data : [];
-        if (rawCats.length > 0) {
-          setCategories(rawCats);
-        }
+        const merged = Array.from(new Set([...rawCats, ...DEFAULT_THERAPEUTIC_CATEGORIES])).filter(Boolean);
+        setCategories(merged);
       }
 
       if (historyRes.status === 'fulfilled' && historyRes.value?.data) {
@@ -383,8 +382,14 @@ export const InventoryProvider = ({ children }) => {
       const shelf = batchData.shelf?.trim() || 'Shelf 1';
 
       const payload = {
-        medicineId: targetMed?._id || batchData.medicineId,
+        batchId: batchData.batchId?.trim() || `BAT-${Math.floor(1000 + Math.random() * 9000)}`,
+        medicineId: targetMed?._id || targetMed?.id || batchData.medicineId,
         medicineCode: targetMed?.medicineId || batchData.medicineId,
+        medicineName: targetMed?.name || batchData.medicineName,
+        name: targetMed?.name || batchData.medicineName,
+        genericName: targetMed?.genericName || batchData.genericName,
+        category: targetMed?.category || batchData.category,
+        type: targetMed?.type || batchData.type,
         batchNumber: batchNum,
         manufacturingDate: batchData.manufacturingDate || new Date().toISOString().slice(0, 10),
         expiryDate: batchData.expiryDate,
@@ -401,16 +406,8 @@ export const InventoryProvider = ({ children }) => {
         await fetchInventoryData();
         return res?.data;
       } catch (err) {
-        console.warn('[InventoryContext] API addBatch fallback:', err.message);
-        const newBatch = {
-          ...payload,
-          batchId: `BAT-${Math.floor(1000 + Math.random() * 9000)}`,
-          id: `BAT-${Math.floor(1000 + Math.random() * 9000)}`,
-          location: `${rack}, ${shelf}`,
-          createdAt: new Date().toISOString(),
-        };
-        setBatches((prev) => [newBatch, ...prev]);
-        return newBatch;
+        console.error('[InventoryContext] API addBatch failed:', err.message);
+        throw err;
       }
     },
     [hasPermission, medicines, fetchInventoryData]
@@ -431,14 +428,8 @@ export const InventoryProvider = ({ children }) => {
         await batchService.updateBatch(targetId, updatedFields);
         await fetchInventoryData();
       } catch (err) {
-        console.warn('[InventoryContext] API updateBatch fallback:', err.message);
-        setBatches((prev) =>
-          prev.map((b) =>
-            b.batchId === batchId || b.id === batchId || b._id === batchId
-              ? { ...b, ...updatedFields, updatedAt: new Date().toISOString() }
-              : b
-          )
-        );
+        console.error('[InventoryContext] API updateBatch failed:', err.message);
+        throw err;
       }
     },
     [hasPermission, batches, fetchInventoryData]
@@ -459,10 +450,8 @@ export const InventoryProvider = ({ children }) => {
         await batchService.deleteBatch(targetId);
         await fetchInventoryData();
       } catch (err) {
-        console.warn('[InventoryContext] API deleteBatch fallback:', err.message);
-        setBatches((prev) =>
-          prev.filter((b) => b.batchId !== batchId && b.id !== batchId && b._id !== batchId)
-        );
+        console.error('[InventoryContext] API deleteBatch failed:', err.message);
+        throw err;
       }
     },
     [hasPermission, batches, fetchInventoryData]
@@ -497,33 +486,19 @@ export const InventoryProvider = ({ children }) => {
         await inventoryService.adjustStock({
           batchId: targetId,
           delta: numDelta,
+          newQuantity: newQty,
           actionType,
           reason,
         });
         await fetchInventoryData();
       } catch (err) {
-        console.warn('[InventoryContext] API adjustStock fallback:', err.message);
-        setBatches((prev) =>
-          prev.map((b) =>
-            b.batchId === batchId || b.id === batchId || b._id === batchId
-              ? { ...b, quantity: newQty, updatedAt: new Date().toISOString() }
-              : b
-          )
-        );
-        recordStockHistory({
-          medicineId: target.medicineId,
-          batchId: target.batchId || target.id,
-          previousQuantity: currentQty,
-          changedQuantity: numDelta,
-          newQuantity: newQty,
-          actionType,
-          reason,
-        });
+        console.error('[InventoryContext] API adjustStock failed:', err.message);
+        throw err;
       }
 
       return newQty;
     },
-    [hasPermission, batches, fetchInventoryData, recordStockHistory]
+    [hasPermission, batches, fetchInventoryData]
   );
 
   // Batch-Specific Sale Deduction

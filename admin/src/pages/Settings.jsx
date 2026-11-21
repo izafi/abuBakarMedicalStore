@@ -90,15 +90,21 @@ export const Settings = () => {
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  // Save Settings to Backend API
+  // Save Settings to Backend API & MongoDB
   const handleSaveSettings = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     try {
       setIsSaving(true);
-      await updateSettings(formData);
+      const updated = await updateSettings(formData);
+      if (updated) {
+        setFormData((prev) => ({
+          ...prev,
+          ...updated,
+        }));
+      }
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 2500);
-      alert.success('Settings Saved', 'System configurations have been successfully synchronized.');
+      alert.success('Settings Saved', 'System configurations have been saved to the database and applied across the website.');
     } catch (err) {
       alert.error('Failed to Save', err.message || 'Could not update system settings.');
     } finally {

@@ -16,9 +16,11 @@ import { Button } from './Button';
 import { Badge } from './Badge';
 import { APP_INFO } from '../../utils/constants';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
+import { useSettings } from '../../hooks/useSettings';
 
 export const InvoiceModal = ({ isOpen, onClose, invoice, onNewSale }) => {
   const navigate = useNavigate();
+  const { settings } = useSettings();
 
   if (!isOpen || !invoice) return null;
 
@@ -85,16 +87,16 @@ export const InvoiceModal = ({ isOpen, onClose, invoice, onNewSale }) => {
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-2xl font-black text-[#0F3A2C] tracking-tight">
-                    {APP_INFO.NAME}
+                    {settings?.storeName || invoice.store?.name || APP_INFO.NAME}
                   </h2>
                   <p className="text-xs uppercase tracking-widest text-[#1C9A58] font-bold mt-0.5">
-                    {APP_INFO.TAGLINE}
+                    {settings?.tagline || invoice.store?.tagline || APP_INFO.TAGLINE}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    {APP_INFO.ADDRESS} &bull; Ph: {APP_INFO.PHONE}
+                    {settings?.address || invoice.store?.address || APP_INFO.ADDRESS} &bull; Ph: {settings?.phone || settings?.contactNumber || invoice.store?.phone || APP_INFO.PHONE}
                   </p>
                   <p className="text-[11px] text-gray-400">
-                    Govt. Drug License: <span className="font-mono">{APP_INFO.LICENSE_NUMBER}</span>
+                    Govt. Drug License: <span className="font-mono">{settings?.licenseNumber || invoice.store?.licenseNumber || APP_INFO.LICENSE_NUMBER}</span>
                   </p>
                 </div>
 
@@ -283,7 +285,7 @@ export const InvoiceModal = ({ isOpen, onClose, invoice, onNewSale }) => {
             {/* Footer / Legal Notice */}
             <div className="mt-8 pt-4 border-t border-dashed border-gray-300 text-center text-[10px] text-gray-400 space-y-1">
               <p className="font-medium text-gray-600">
-                Thank you for choosing Abu Bakar Medical Store!
+                Thank you for choosing {settings?.storeName || invoice.store?.name || APP_INFO.NAME}!
               </p>
               <p>
                 Medicines once sold cannot be returned without original cash receipt within 3 days.
