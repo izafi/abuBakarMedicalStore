@@ -3,25 +3,23 @@ import { SettingsContext } from './contexts';
 import { settingsService } from '../services/settingsService';
 import { DEFAULT_SETTINGS } from '../data/initialSettings';
 
-const SETTINGS_STORAGE_KEY = 'abm_store_settings_v3';
-
-const getCachedSettings = () => {
-  try {
-    const cached = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      return { ...DEFAULT_SETTINGS, ...parsed };
-    }
-  } catch (e) {
-    // ignore json parse error
-  }
-  return DEFAULT_SETTINGS;
-};
-
 export const SettingsProvider = ({ children }) => {
-  const [settings, setSettings] = useState(getCachedSettings);
+  // Purely in-memory React state (Zero localStorage / sessionStorage)
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Clear any residual browser storage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.clear();
+        window.sessionStorage.clear();
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, []);
 
   // Keep document title synchronized with store name
   useEffect(() => {
@@ -30,22 +28,14 @@ export const SettingsProvider = ({ children }) => {
     }
   }, [settings?.storeName, settings?.tagline]);
 
-  // Fetch settings dynamically from backend REST API
+  // Fetch settings dynamically from backend REST API (MongoDB)
   const fetchSettings = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
       const res = await settingsService.getSettings();
       if (res?.data) {
-        setSettings((prev) => {
-          const merged = { ...prev, ...res.data };
-          try {
-            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(merged));
-          } catch (e) {
-            // ignore storage quota
-          }
-          return merged;
-        });
+        setSettings((prev) => ({ ...prev, ...res.data }));
       }
     } catch (err) {
       console.warn('[SettingsContext] Could not fetch settings from backend, using baseline defaults:', err.message);
@@ -72,43 +62,32 @@ export const SettingsProvider = ({ children }) => {
       nearExpiryDays: Math.max(1, Number(newValues.nearExpiryDays) || 60),
     };
 
-    // Optimistic local update & localStorage persistence
-    setSettings((prev) => {
-      const updated = { ...prev, ...sanitized };
-      try {
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(updated));
-      } catch (e) {
-        // ignore storage error
-      }
-      return updated;
-    });
+    // Optimistic in-memory update
+    setSettings((prev) => ({ ...prev, ...sanitized }));
 
     try {
       const res = await settingsService.updateSettings(sanitized);
       if (res?.data) {
-        setSettings((prev) => {
-          const finalSettings = { ...prev, ...res.data };
-          try {
-            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(finalSettings));
-          } catch (e) {
-            // ignore
-          }
-          return finalSettings;
-        });
+        setSettings((prev) => ({ ...prev, ...res.data }));
         return res.data;
       }
       return sanitized;
     } catch (err) {
       console.error('[SettingsContext] Failed to save settings to API:', err);
+      // Revert/refresh on error
+      fetchSettings();
       throw err;
     }
-  }, []);
+  }, [fetchSettings]);
 
   // Reset entire application data back to initial seeds via backend API
   const resetDemoData = useCallback(async () => {
     try {
       await settingsService.resetDemoData();
-      localStorage.removeItem(SETTINGS_STORAGE_KEY);
+      if (typeof window !== 'undefined') {
+        window.localStorage.clear();
+        window.sessionStorage.clear();
+      }
     } catch (err) {
       console.warn('[SettingsContext] Backend reset demo endpoint error:', err.message);
     }
