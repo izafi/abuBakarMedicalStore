@@ -403,7 +403,7 @@ export const MedicineCounter = () => {
       </div>
 
       {/* =========================================================================
-          MAIN TABLE (All Essential Fields Preserved, NO ID Column, NO Horizontal Scrollbar)
+          MAIN TABLE (All Essential Fields Preserved, NO Horizontal Scrollbar)
           ========================================================================= */}
       {viewMode === 'table' ? (
         <div className="w-full bg-white rounded-xl border border-slate-300 shadow-xs overflow-hidden">
@@ -411,13 +411,13 @@ export const MedicineCounter = () => {
             <table className="w-full text-left border-collapse table-auto">
               <thead>
                 <tr className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none">
-                  {/* 1. Medicine Name */}
+                  {/* 1. Name */}
                   <th
                     onClick={() => handleSort('name')}
-                    className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                    className="py-2 px-2.5 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1 text-black font-bold">
-                      <span>Medicine Name</span>
+                      <span>Name</span>
                       <ArrowUpDown className="w-3 h-3 text-black shrink-0" />
                     </div>
                   </th>
@@ -425,7 +425,7 @@ export const MedicineCounter = () => {
                   {/* 2. Generic Name */}
                   <th
                     onClick={() => handleSort('genericName')}
-                    className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                    className="py-2 px-2 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
                   >
                     <div className="flex items-center gap-1 text-black font-bold">
                       <span>Generic Name</span>
@@ -434,33 +434,33 @@ export const MedicineCounter = () => {
                   </th>
 
                   {/* 3. Formula */}
-                  <th className="py-2.5 px-3 text-black font-bold whitespace-nowrap">
+                  <th className="py-2 px-2 text-black font-bold whitespace-nowrap">
                     <span>Formula</span>
                   </th>
 
                   {/* 4. Strength */}
-                  <th className="py-2.5 px-3 text-center text-black font-bold whitespace-nowrap">
+                  <th className="py-2 px-1 text-center text-black font-bold whitespace-nowrap">
                     <span>Strength</span>
                   </th>
 
                   {/* 5. Type */}
                   <th
                     onClick={() => handleSort('type')}
-                    className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                    className="py-2 px-1 text-center cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
                   >
-                    <div className="flex items-center gap-1 text-black font-bold">
+                    <div className="flex items-center justify-center gap-1 text-black font-bold">
                       <span>Type</span>
                       <ArrowUpDown className="w-3 h-3 text-black shrink-0" />
                     </div>
                   </th>
 
-                  {/* 6. Selling Price */}
+                  {/* 6. Price */}
                   <th
                     onClick={() => handleSort('sellingPrice')}
-                    className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                    className="py-2 px-2 text-right cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
                   >
                     <div className="flex items-center justify-end gap-1 text-black font-bold">
-                      <span>Selling Price</span>
+                      <span>Price</span>
                       <ArrowUpDown className="w-3 h-3 text-black shrink-0" />
                     </div>
                   </th>
@@ -468,7 +468,7 @@ export const MedicineCounter = () => {
                   {/* 7. Available Stock */}
                   <th
                     onClick={() => handleSort('stock')}
-                    className="py-2.5 px-3 text-center cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                    className="py-2 px-1.5 text-center cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
                   >
                     <div className="flex items-center justify-center gap-1 text-black font-bold">
                       <span>Stock</span>
@@ -477,17 +477,17 @@ export const MedicineCounter = () => {
                   </th>
 
                   {/* 8. Rack */}
-                  <th className="py-2.5 px-3 text-center text-black font-bold whitespace-nowrap">
+                  <th className="py-2 px-1 text-center text-black font-bold whitespace-nowrap">
                     <span>Rack</span>
                   </th>
 
                   {/* 9. Shelf */}
-                  <th className="py-2.5 px-3 text-center text-black font-bold whitespace-nowrap">
+                  <th className="py-2 px-1 text-center text-black font-bold whitespace-nowrap">
                     <span>Shelf</span>
                   </th>
 
                   {/* 10. Actions */}
-                  <th className="py-2.5 px-3 text-right text-black font-bold whitespace-nowrap">
+                  <th className="py-2 px-2 text-right text-black font-bold whitespace-nowrap">
                     <span>Actions</span>
                   </th>
                 </tr>
@@ -537,16 +537,18 @@ export const MedicineCounter = () => {
                     const isDepleted = stockCount === 0;
                     const isLow = stockCount > 0 && stockCount <= (med.minStockAlert || 15);
                     const sellingPrice = activeBatch ? activeBatch.sellingPrice : med.sellingPrice;
-                    const rack = activeBatch?.rack || med.rack || 'A-1';
-                    const shelf = activeBatch?.shelf || med.shelf || '1';
+                    const rawRack = activeBatch?.rack || med.rack || 'A-1';
+                    const rawShelf = activeBatch?.shelf || med.shelf || '1';
+                    const cleanRack = String(rawRack).replace(/^(rack|r)\s*[:-]?\s*/i, '').trim() || '-';
+                    const cleanShelf = String(rawShelf).replace(/^(shelf|s)\s*[:-]?\s*/i, '').trim() || '-';
 
                     return (
                       <tr
                         key={med.medicineId}
                         className="hover:bg-slate-50 transition-colors"
                       >
-                        {/* 1. Medicine Name */}
-                        <td className="py-2.5 px-3">
+                        {/* 1. Name */}
+                        <td className="py-2 px-2.5">
                           <div>
                             <p
                               onClick={() => setViewingMedicine(med)}
@@ -555,96 +557,95 @@ export const MedicineCounter = () => {
                             >
                               {cleanName}
                             </p>
-                            <p className="text-[11px] text-black font-semibold leading-tight mt-0.5 truncate max-w-[160px]">
+                            <p className="text-[11px] text-black font-semibold leading-tight mt-0.5 truncate max-w-[130px]">
                               {med.brand || 'Standard'}
                             </p>
                           </div>
                         </td>
 
                         {/* 2. Generic Name */}
-                        <td className="py-2.5 px-3 text-[11px] text-black font-bold max-w-[140px] truncate" title={med.genericName}>
+                        <td className="py-2 px-2 text-[11px] text-black font-bold max-w-[120px] truncate" title={med.genericName}>
                           {med.genericName}
                         </td>
 
                         {/* 3. Formula */}
-                        <td className="py-2.5 px-3 text-[11px] text-black font-bold max-w-[120px] truncate" title={med.formula}>
+                        <td className="py-2 px-2 text-[11px] text-black font-bold max-w-[100px] truncate" title={med.formula}>
                           {med.formula || 'Standard'}
                         </td>
 
                         {/* 4. Strength */}
-                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                          <span className="text-[10px] font-mono font-bold text-black bg-slate-100 px-1.5 py-0.5 rounded border border-slate-300">
+                        <td className="py-2 px-1 text-center whitespace-nowrap">
+                          <span className="text-[10px] font-mono font-bold text-black bg-slate-100 px-1 py-0.5 rounded border border-slate-300">
                             {med.strength || 'N/A'}
                           </span>
                         </td>
 
                         {/* 5. Type */}
-                        <td className="py-2.5 px-3 whitespace-nowrap">
-                          <span className="text-[10px] font-bold text-black bg-slate-100 px-2 py-0.5 rounded-md border border-slate-300">
+                        <td className="py-2 px-1 text-center whitespace-nowrap">
+                          <span className="text-[10px] font-bold text-black bg-slate-100 px-1.5 py-0.5 rounded border border-slate-300">
                             {med.type}
                           </span>
                         </td>
 
-                        {/* 6. Selling Price */}
-                        <td className="py-2.5 px-3 text-right font-extrabold text-[#1C9A58] text-xs whitespace-nowrap tabular-nums">
-                          {formatCurrency(sellingPrice)}
+                        {/* 6. Price (Without Rs.) */}
+                        <td className="py-2 px-2 text-right font-extrabold text-[#1C9A58] text-xs whitespace-nowrap tabular-nums">
+                          {Number(sellingPrice || 0).toFixed(2)}
                         </td>
 
                         {/* 7. Available Stock */}
-                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                        <td className="py-2 px-1.5 text-center whitespace-nowrap">
                           {isDepleted ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-300">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-300">
                               <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
                               Out of Stock
                             </span>
                           ) : isLow ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-300">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-300">
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
                               Low ({stockCount})
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-300">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-300">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
                               {stockCount} units
                             </span>
                           )}
                         </td>
 
-                        {/* 8. Rack */}
-                        <td className="py-2.5 px-3 text-center font-mono text-xs font-bold text-black whitespace-nowrap">
-                          {rack}
+                        {/* 8. Rack (without the word 'Rack') */}
+                        <td className="py-2 px-1 text-center font-mono text-xs font-bold text-black whitespace-nowrap">
+                          {cleanRack}
                         </td>
 
-                        {/* 9. Shelf */}
-                        <td className="py-2.5 px-3 text-center font-mono text-xs font-bold text-black whitespace-nowrap">
-                          {shelf}
+                        {/* 9. Shelf (without the word 'Shelf') */}
+                        <td className="py-2 px-1 text-center font-mono text-xs font-bold text-black whitespace-nowrap">
+                          {cleanShelf}
                         </td>
 
                         {/* 10. Actions (Add to Sale Cart, Details, Edit, Delete) */}
-                        <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                        <td className="py-2 px-2 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1">
-                            {/* Primary Add to Sale Cart Button */}
+                            {/* Primary Add to Sale Cart Button - Icon Only */}
                             <button
                               type="button"
                               onClick={() => handleAddMedicineToSale(med)}
                               disabled={isDepleted || !canAddSale}
-                              className={`px-2.5 py-1 text-xs font-bold rounded-md shadow-2xs flex items-center gap-1 transition-colors cursor-pointer ${
+                              className={`w-7 h-7 flex items-center justify-center rounded-md shadow-2xs transition-colors cursor-pointer shrink-0 ${
                                 isDepleted || !canAddSale
                                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
                                   : 'bg-[#1C9A58] hover:bg-[#158046] text-white border border-emerald-600'
                               }`}
                               title={isDepleted ? 'Out of Stock' : 'Add to Active Sale Bill'}
                             >
-                              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                              <span>Add</span>
+                              <Plus className="w-4 h-4 stroke-[2.5]" />
                             </button>
 
                             {/* View Details */}
                             <button
                               type="button"
                               onClick={() => setViewingMedicine(med)}
-                              className="p-1 text-black hover:text-[#1C9A58] hover:bg-emerald-50 rounded-md transition-colors cursor-pointer"
-                              title="View Complete Medicine & Batches Details"
+                              className="w-7 h-7 flex items-center justify-center text-black hover:text-[#1C9A58] hover:bg-emerald-50 rounded-md transition-colors cursor-pointer shrink-0"
+                              title="View Details"
                             >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
@@ -657,7 +658,7 @@ export const MedicineCounter = () => {
                                   setEditingMedicine(med);
                                   setIsFormOpen(true);
                                 }}
-                                className="p-1 text-black hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors cursor-pointer"
+                                className="w-7 h-7 flex items-center justify-center text-black hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors cursor-pointer shrink-0"
                                 title="Edit Medicine"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
@@ -669,7 +670,7 @@ export const MedicineCounter = () => {
                               <button
                                 type="button"
                                 onClick={() => setDeleteTarget(med)}
-                                className="p-1 text-black hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                                className="w-7 h-7 flex items-center justify-center text-black hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors cursor-pointer shrink-0"
                                 title="Delete Medicine"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
