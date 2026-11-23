@@ -448,55 +448,55 @@ export const SalesHistory = () => {
           <table className="w-full text-left border-collapse table-auto text-xs">
             <thead>
               <tr className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none">
-                {/* 1. Invoice Number */}
+                {/* 1. Invoice */}
                 <th
                   onClick={() => handleSort('invoiceNumber')}
-                  className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                  className="py-2 px-2.5 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
                 >
                   <div className="flex items-center gap-1 text-black font-bold">
-                    <span>Invoice #</span>
+                    <span>Invoice</span>
                     <ArrowUpDown className="w-3 h-3 text-black shrink-0 stroke-[2.2]" />
                   </div>
                 </th>
 
-                {/* 2. Patient & Doctor */}
-                <th className="py-2.5 px-3 text-black font-bold whitespace-nowrap">
-                  <span>Patient & Doctor</span>
+                {/* 2. Customer / Doctor */}
+                <th className="py-2 px-2 text-black font-bold whitespace-nowrap">
+                  <span>Customer / Dr.</span>
                 </th>
 
-                {/* 3. Medicines Dispensed */}
-                <th className="py-2.5 px-3 text-black font-bold whitespace-nowrap">
-                  <span>Medicines Dispensed</span>
+                {/* 3. Medicines */}
+                <th className="py-2 px-2 text-black font-bold whitespace-nowrap">
+                  <span>Medicines</span>
                 </th>
 
                 {/* 4. Subtotal / Discount */}
-                <th className="py-2.5 px-3 text-right text-black font-bold whitespace-nowrap">
+                <th className="py-2 px-2 text-right text-black font-bold whitespace-nowrap">
                   <span>Subtotal / Disc</span>
                 </th>
 
-                {/* 5. Final Amount */}
+                {/* 5. Amount */}
                 <th
                   onClick={() => handleSort('grandTotal')}
-                  className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                  className="py-2 px-2 text-right cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
                 >
                   <div className="flex items-center justify-end gap-1 text-black font-bold">
-                    <span>Final Amount</span>
+                    <span>Amount</span>
                     <ArrowUpDown className="w-3 h-3 text-black shrink-0 stroke-[2.2]" />
                   </div>
                 </th>
 
-                {/* 6. Payment Method */}
-                <th className="py-2.5 px-3 text-center text-black font-bold whitespace-nowrap">
+                {/* 6. Payment */}
+                <th className="py-2 px-1.5 text-center text-black font-bold whitespace-nowrap">
                   <span>Payment</span>
                 </th>
 
-                {/* 7. Dispensed By */}
-                <th className="py-2.5 px-3 text-black font-bold whitespace-nowrap">
-                  <span>Dispensed By</span>
+                {/* 7. Cashier */}
+                <th className="py-2 px-2 text-black font-bold whitespace-nowrap">
+                  <span>Cashier</span>
                 </th>
 
                 {/* 8. Actions */}
-                <th className="py-2.5 px-3 text-right text-black font-bold whitespace-nowrap min-w-[120px]">
+                <th className="py-2 px-2 text-right text-black font-bold whitespace-nowrap">
                   <span>Actions</span>
                 </th>
               </tr>
@@ -533,36 +533,33 @@ export const SalesHistory = () => {
                       onClick={() => setSelectedInvoice(s)}
                       className="hover:bg-slate-50 transition-colors cursor-pointer group"
                     >
-                      {/* 1. Invoice Number & Timestamp */}
-                      <td className="py-2.5 px-3">
+                      {/* 1. Invoice & Timestamp */}
+                      <td className="py-2 px-2.5">
                         <span className="font-mono font-bold text-black text-xs group-hover:text-[#1C9A58] transition-colors block">
                           {s.invoiceNumber}
                         </span>
-                        <div className="flex items-center gap-1 text-[11px] text-black font-semibold mt-0.5 whitespace-nowrap">
-                          <Calendar className="w-3 h-3 text-black shrink-0 stroke-[2.2]" />
+                        <div className="text-[11px] text-black font-semibold mt-0.5 whitespace-nowrap">
                           <span>{formatDate(s.date)}</span>
-                          <span>&bull;</span>
+                          <span className="mx-1">&bull;</span>
                           <span>{new Date(s.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                       </td>
 
-                      {/* 2. Patient & Prescribing Doctor */}
-                      <td className="py-2.5 px-3">
+                      {/* 2. Customer & Doctor */}
+                      <td className="py-2 px-2">
                         <div className="space-y-0.5">
-                          <p className="font-bold text-black text-xs flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5 text-[#1C9A58] stroke-[2.2] shrink-0" />
-                            <span>{s.patientName || s.customerName || 'Walk-in Customer'}</span>
+                          <p className="font-bold text-black text-xs truncate max-w-[140px]">
+                            {s.patientName || s.customerName || 'Walk-in'}
                           </p>
-                          <p className="text-[11px] text-black font-semibold flex items-center gap-1.5">
-                            <Stethoscope className="w-3.5 h-3.5 text-teal-700 stroke-[2] shrink-0" />
-                            <span>{s.doctorName || 'Self / OTC'}</span>
+                          <p className="text-[11px] text-black font-semibold truncate max-w-[140px]">
+                            {s.doctorName || 'Self'}
                           </p>
                         </div>
                       </td>
 
-                      {/* 3. Medicines Dispensed */}
-                      <td className="py-2.5 px-3">
-                        <div className="space-y-0.5 max-w-[220px]">
+                      {/* 3. Medicines */}
+                      <td className="py-2 px-2">
+                        <div className="space-y-0.5 max-w-[180px]">
                           <div className="text-xs font-bold text-black truncate">
                             {firstTwo.map((i) => i.medicineName || i.name).join(', ')}
                             {remaining > 0 && (
@@ -571,23 +568,24 @@ export const SalesHistory = () => {
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-black font-semibold flex items-center gap-1">
-                            <Pill className="w-3.5 h-3.5 text-emerald-700 stroke-[2] shrink-0" />
+                          <div className="text-[11px] text-black font-semibold">
                             <span>
-                              {itemCount} line item{itemCount > 1 ? 's' : ''} &bull;{' '}
+                              {itemCount} item{itemCount > 1 ? 's' : ''} &bull;{' '}
                               <strong className="text-black font-bold">{totalQty} units</strong>
                             </span>
                           </div>
                         </div>
                       </td>
 
-                      {/* 4. Subtotal / Discount */}
-                      <td className="py-2.5 px-3 text-right">
+                      {/* 4. Subtotal / Discount (Without Rs.) */}
+                      <td className="py-2 px-2 text-right">
                         <div className="text-xs space-y-0.5">
-                          <p className="font-mono text-black font-bold">{formatCurrency(s.subtotal)}</p>
+                          <p className="font-mono text-black font-bold">
+                            {Number(s.subtotal || 0).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
                           {s.discountAmount > 0 ? (
                             <p className="font-mono text-[11px] text-emerald-700 font-bold">
-                              -{formatCurrency(s.discountAmount)}
+                              -{Number(s.discountAmount || 0).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                           ) : (
                             <p className="font-mono text-[10px] text-black font-bold">-</p>
@@ -595,49 +593,54 @@ export const SalesHistory = () => {
                         </div>
                       </td>
 
-                      {/* 5. Final Amount */}
-                      <td className="py-2.5 px-3 text-right">
-                        <span className="font-mono font-black text-sm text-[#0F3A2C] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300 inline-block shadow-2xs">
-                          {formatCurrency(s.grandTotal)}
+                      {/* 5. Amount (Without Rs.) */}
+                      <td className="py-2 px-2 text-right">
+                        <span className="font-mono font-black text-xs text-[#0F3A2C] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300 inline-block shadow-2xs">
+                          {Number(s.grandTotal || 0).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </td>
 
                       {/* 6. Payment Badge */}
-                      <td className="py-2.5 px-3 text-center">
+                      <td className="py-2 px-1.5 text-center">
                         {s.paymentMethod === 'Card' ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-950 border border-blue-300 shadow-2xs whitespace-nowrap">
-                            <CreditCard className="w-3.5 h-3.5 text-blue-800 stroke-[2.2]" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-950 border border-blue-300 shadow-2xs whitespace-nowrap">
+                            <CreditCard className="w-3 h-3 text-blue-800 stroke-[2.2]" />
                             <span>Card</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-2xs whitespace-nowrap">
-                            <Banknote className="w-3.5 h-3.5 text-emerald-800 stroke-[2.2]" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-950 border border-emerald-300 shadow-2xs whitespace-nowrap">
+                            <Banknote className="w-3 h-3 text-emerald-800 stroke-[2.2]" />
                             <span>Cash</span>
                           </span>
                         )}
                       </td>
 
-                      {/* 7. Dispensed By */}
-                      <td className="py-2.5 px-3">
+                      {/* 7. Cashier */}
+                      <td className="py-2 px-2">
                         <div className="text-xs">
                           <p className="font-bold text-black">{s.employeeName || s.cashierName || 'Staff'}</p>
-                          <p className="text-[10px] text-black font-semibold mt-0.5 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 inline-block">
-                            {s.employeeId || (s.employeeUsername ? `@${s.employeeUsername}` : 'Cashier')}
-                          </p>
+                          {s.employeeId && !/^[0-9a-fA-F]{24}$/.test(s.employeeId) ? (
+                            <p className="text-[10px] text-black font-semibold mt-0.5 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 inline-block">
+                              {s.employeeId}
+                            </p>
+                          ) : s.employeeUsername ? (
+                            <p className="text-[10px] text-black font-semibold mt-0.5 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 inline-block">
+                              @{s.employeeUsername}
+                            </p>
+                          ) : null}
                         </div>
                       </td>
 
-                      {/* 8. Actions (Readable Icons, Cursor Pointer, No-Cutoff) */}
-                      <td className="py-2.5 px-3 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1.5">
+                      {/* 8. Actions */}
+                      <td className="py-2 px-2 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
                           <button
                             type="button"
                             onClick={() => setSelectedInvoice(s)}
-                            className="text-xs font-bold text-black bg-white hover:bg-slate-100 border border-slate-300 hover:border-black rounded-lg px-2.5 py-1.5 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                            title="View full invoice details"
+                            className="w-7 h-7 flex items-center justify-center text-black hover:text-[#1C9A58] hover:bg-emerald-50 rounded-md border border-slate-300 hover:border-emerald-600 transition-colors shadow-2xs cursor-pointer shrink-0"
+                            title="View invoice details"
                           >
-                            <Eye className="w-3.5 h-3.5 text-black stroke-[2.2]" />
-                            <span>Invoice</span>
+                            <Eye className="w-3.5 h-3.5 stroke-[2.2]" />
                           </button>
 
                           <button
@@ -646,8 +649,8 @@ export const SalesHistory = () => {
                               setSelectedInvoice(s);
                               setTimeout(() => window.print(), 300);
                             }}
-                            className="p-1.5 hover:bg-slate-100 rounded-lg border border-slate-300 hover:border-black cursor-pointer transition-colors shadow-2xs text-black hover:text-[#1C9A58]"
-                            title="Print thermal receipt"
+                            className="w-7 h-7 flex items-center justify-center text-black hover:text-black hover:bg-slate-100 rounded-md border border-slate-300 hover:border-black transition-colors shadow-2xs cursor-pointer shrink-0"
+                            title="Print receipt"
                           >
                             <Printer className="w-3.5 h-3.5 stroke-[2.2]" />
                           </button>
