@@ -121,7 +121,7 @@ export const BatchTable = ({
               {showMedicineCol && (
                 <th
                   onClick={() => handleSort('medicineName')}
-                  className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                  className="py-2 px-2.5 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
                 >
                   <div className="flex items-center gap-1 text-black font-bold">
                     <span>Medicine</span>
@@ -132,7 +132,7 @@ export const BatchTable = ({
 
               <th
                 onClick={() => handleSort('batchNumber')}
-                className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                className="py-2 px-1.5 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
               >
                 <div className="flex items-center gap-1 text-black font-bold">
                   <span>Batch</span>
@@ -142,7 +142,7 @@ export const BatchTable = ({
 
               <th
                 onClick={() => handleSort('quantity')}
-                className="py-2.5 px-3 text-center cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                className="py-2 px-1.5 text-center cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
               >
                 <div className="flex items-center justify-center gap-1 text-black font-bold">
                   <span>Stock</span>
@@ -150,17 +150,17 @@ export const BatchTable = ({
                 </div>
               </th>
 
-              <th className="py-2.5 px-3 whitespace-nowrap text-black font-bold">
+              <th className="py-2 px-2 whitespace-nowrap text-black font-bold">
                 <span>Selling</span>
               </th>
 
-              <th className="py-2.5 px-3 whitespace-nowrap text-black font-bold">
+              <th className="py-2 px-1 text-center whitespace-nowrap text-black font-bold">
                 <span>Rack / Shelf</span>
               </th>
 
               <th
                 onClick={() => handleSort('expiryDate')}
-                className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                className="py-2 px-2 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
               >
                 <div className="flex items-center gap-1 text-black font-bold">
                   <span>Expiry</span>
@@ -168,11 +168,11 @@ export const BatchTable = ({
                 </div>
               </th>
 
-              <th className="py-2.5 px-3 text-center whitespace-nowrap text-black font-bold">
+              <th className="py-2 px-1.5 text-center whitespace-nowrap text-black font-bold">
                 <span>Status</span>
               </th>
 
-              <th className="py-2.5 px-3 text-right whitespace-nowrap text-black font-bold">
+              <th className="py-2 px-2 text-right whitespace-nowrap text-black font-bold">
                 <span>Actions</span>
               </th>
             </tr>
@@ -212,12 +212,12 @@ export const BatchTable = ({
                   >
                     {/* 1. Medicine */}
                     {showMedicineCol && (
-                      <td className="py-2.5 px-3">
+                      <td className="py-2 px-2.5">
                         <div>
                           <p className="font-bold text-black text-xs leading-tight">
                             {batch.medicineName}
                           </p>
-                          <p className="text-[10px] text-black font-semibold font-mono mt-0.5 truncate max-w-[170px]">
+                          <p className="text-[10px] text-black font-semibold font-mono mt-0.5 truncate max-w-[140px]">
                             {batch.medicineId} • {batch.category || 'General'}
                           </p>
                         </div>
@@ -225,7 +225,7 @@ export const BatchTable = ({
                     )}
 
                     {/* 2. Batch Number */}
-                    <td className="py-2.5 px-3 whitespace-nowrap">
+                    <td className="py-2 px-1.5 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono font-bold text-black bg-slate-100 px-2 py-0.5 rounded border border-slate-300 text-xs">
                           {batch.batchNumber || batch.batchNo}
@@ -243,24 +243,24 @@ export const BatchTable = ({
                     </td>
 
                     {/* 3. Stock Quantity */}
-                    <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                    <td className="py-2 px-1.5 text-center whitespace-nowrap">
                       {batch.quantity === 0 ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-300">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-300">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
                           0 units
                         </span>
                       ) : isExpired ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-900 border border-rose-300 line-through">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-900 border border-rose-300 line-through">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
                           {batch.quantity} units
                         </span>
                       ) : batch.quantity <= 20 ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-300">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-300">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
                           {batch.quantity} units
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-300">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-900 border border-emerald-300">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
                           {batch.quantity} units
                         </span>
@@ -268,7 +268,7 @@ export const BatchTable = ({
                     </td>
 
                     {/* 4. Cost / Selling */}
-                    <td className="py-2.5 px-3 whitespace-nowrap">
+                    <td className="py-2 px-2 whitespace-nowrap">
                       <div className="space-y-0.5">
                         <p className="text-xs font-extrabold text-[#1C9A58] tabular-nums">
                           {formatCurrency(batch.sellingPrice)}
@@ -280,14 +280,12 @@ export const BatchTable = ({
                     </td>
 
                     {/* 5. Rack / Shelf */}
-                    <td className="py-2.5 px-3 whitespace-nowrap">
-                      <span className="font-mono font-bold text-xs text-black">
-                        {cleanRack}, {cleanShelf}
-                      </span>
+                    <td className="py-2 px-1 text-center whitespace-nowrap font-mono font-bold text-xs text-black">
+                      {cleanRack}, {cleanShelf}
                     </td>
 
                     {/* 6. Expiry Date */}
-                    <td className="py-2.5 px-3 whitespace-nowrap">
+                    <td className="py-2 px-2 whitespace-nowrap">
                       <div className="space-y-0.5">
                         <span
                           className={`text-[11px] font-bold block ${
@@ -319,7 +317,7 @@ export const BatchTable = ({
                     </td>
 
                     {/* 7. Stock Status */}
-                    <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                    <td className="py-2 px-1.5 text-center whitespace-nowrap">
                       {getStatusBadge(
                         batch.status,
                         isExpired,
@@ -328,18 +326,17 @@ export const BatchTable = ({
                       )}
                     </td>
 
-                    {/* 8. Actions (Readable Well-Sized Action Buttons) */}
-                    <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                    {/* 8. Actions */}
+                    <td className="py-2 px-2 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
                         {canEdit && onAdjustStock && (
                           <button
                             type="button"
                             onClick={() => onAdjustStock(batch)}
-                            title="Adjust / Update Physical Stock"
-                            className="px-2.5 py-1 text-xs font-bold text-[#1C9A58] bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-300 rounded-md transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                            title="Adjust Physical Stock"
+                            className="w-7 h-7 flex items-center justify-center text-xs font-bold text-[#1C9A58] bg-emerald-50 hover:bg-[#1C9A58] hover:text-white border border-emerald-300 rounded-md transition-colors cursor-pointer shadow-2xs shrink-0"
                           >
                             <Boxes className="w-3.5 h-3.5 stroke-[2.2]" />
-                            <span>Stock</span>
                           </button>
                         )}
 
@@ -347,8 +344,8 @@ export const BatchTable = ({
                           <button
                             type="button"
                             onClick={() => onEditBatch(batch)}
-                            title="Edit Batch Specifications"
-                            className="p-1 text-black hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors cursor-pointer"
+                            title="Edit Batch"
+                            className="w-7 h-7 flex items-center justify-center text-black hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors cursor-pointer shrink-0"
                           >
                             <Edit2 className="w-3.5 h-3.5 stroke-[2.2]" />
                           </button>
@@ -358,8 +355,8 @@ export const BatchTable = ({
                           <button
                             type="button"
                             onClick={() => onDeleteBatch(batch)}
-                            title="Delete Batch from Inventory"
-                            className="p-1 text-black hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                            title="Delete Batch"
+                            className="w-7 h-7 flex items-center justify-center text-black hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors cursor-pointer shrink-0"
                           >
                             <Trash2 className="w-3.5 h-3.5 stroke-[2.2]" />
                           </button>
