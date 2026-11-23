@@ -4,8 +4,6 @@ import {
   Edit2,
   Trash2,
   Boxes,
-  MapPin,
-  Calendar,
   Layers,
   ChevronLeft,
   ChevronRight,
@@ -126,7 +124,7 @@ export const BatchTable = ({
                   className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
                 >
                   <div className="flex items-center gap-1 text-black font-bold">
-                    <span>Medicine Master</span>
+                    <span>Medicine</span>
                     <ArrowUpDown className="w-3 h-3 text-black shrink-0" />
                   </div>
                 </th>
@@ -137,7 +135,7 @@ export const BatchTable = ({
                 className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
               >
                 <div className="flex items-center gap-1 text-black font-bold">
-                  <span>Batch Number</span>
+                  <span>Batch</span>
                   <ArrowUpDown className="w-3 h-3 text-black shrink-0" />
                 </div>
               </th>
@@ -147,13 +145,13 @@ export const BatchTable = ({
                 className="py-2.5 px-3 text-center cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
               >
                 <div className="flex items-center justify-center gap-1 text-black font-bold">
-                  <span>Stock Quantity</span>
+                  <span>Stock</span>
                   <ArrowUpDown className="w-3 h-3 text-black shrink-0" />
                 </div>
               </th>
 
               <th className="py-2.5 px-3 whitespace-nowrap text-black font-bold">
-                <span>Cost / Selling</span>
+                <span>Selling</span>
               </th>
 
               <th className="py-2.5 px-3 whitespace-nowrap text-black font-bold">
@@ -165,13 +163,13 @@ export const BatchTable = ({
                 className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
               >
                 <div className="flex items-center gap-1 text-black font-bold">
-                  <span>Expiry Date</span>
+                  <span>Expiry</span>
                   <ArrowUpDown className="w-3 h-3 text-black shrink-0" />
                 </div>
               </th>
 
               <th className="py-2.5 px-3 text-center whitespace-nowrap text-black font-bold">
-                <span>Stock Status</span>
+                <span>Status</span>
               </th>
 
               <th className="py-2.5 px-3 text-right whitespace-nowrap text-black font-bold">
@@ -198,6 +196,8 @@ export const BatchTable = ({
               paginatedBatches.map((batch) => {
                 const isExpired = batch.isExpired;
                 const isNearExpiry = batch.isNearExpiry;
+                const cleanRack = String(batch.rack || 'A-1').replace(/^(rack|r)\s*[:-]?\s*/i, '').trim() || '-';
+                const cleanShelf = String(batch.shelf || '1').replace(/^(shelf|s)\s*[:-]?\s*/i, '').trim() || '-';
 
                 return (
                   <tr
@@ -210,7 +210,7 @@ export const BatchTable = ({
                         : ''
                     }`}
                   >
-                    {/* 1. Medicine Master */}
+                    {/* 1. Medicine */}
                     {showMedicineCol && (
                       <td className="py-2.5 px-3">
                         <div>
@@ -242,7 +242,7 @@ export const BatchTable = ({
                       </div>
                     </td>
 
-                    {/* 3. Stock Quantity (Matching Medicine Counter Colorful Pills) */}
+                    {/* 3. Stock Quantity */}
                     <td className="py-2.5 px-3 text-center whitespace-nowrap">
                       {batch.quantity === 0 ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-300">
@@ -281,31 +281,25 @@ export const BatchTable = ({
 
                     {/* 5. Rack / Shelf */}
                     <td className="py-2.5 px-3 whitespace-nowrap">
-                      <div className="flex items-center gap-1 text-black">
-                        <MapPin className="w-3.5 h-3.5 text-black shrink-0" />
-                        <span className="font-mono font-bold text-xs text-black">
-                          {batch.rack || 'Rack A'}, {batch.shelf || 'Shelf 1'}
-                        </span>
-                      </div>
+                      <span className="font-mono font-bold text-xs text-black">
+                        {cleanRack}, {cleanShelf}
+                      </span>
                     </td>
 
                     {/* 6. Expiry Date */}
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       <div className="space-y-0.5">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5 text-black shrink-0" />
-                          <span
-                            className={`text-[11px] font-bold ${
-                              isExpired
-                                ? 'text-rose-600 font-extrabold'
-                                : isNearExpiry
-                                ? 'text-amber-700 font-extrabold'
-                                : 'text-black'
-                            }`}
-                          >
-                            {formatDate(batch.expiryDate)}
-                          </span>
-                        </div>
+                        <span
+                          className={`text-[11px] font-bold block ${
+                            isExpired
+                              ? 'text-rose-600 font-extrabold'
+                              : isNearExpiry
+                              ? 'text-amber-700 font-extrabold'
+                              : 'text-black'
+                          }`}
+                        >
+                          {formatDate(batch.expiryDate)}
+                        </span>
                         {batch.daysLeft !== undefined && (
                           <p
                             className={`text-[10px] font-bold ${
