@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { Modal } from '../components/common/Modal';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
+import FilterDropdown from '../components/common/FilterDropdown';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import {
@@ -295,39 +296,40 @@ export const EmployeesPermissions = () => {
     }
   };
 
-  const handleToggleStatus = (emp) => {
+  const handleToggleStatus = async (emp) => {
     try {
-      const newStatus = toggleEmployeeStatus(emp.employeeId);
-      toast.showSuccess(`${emp.name} is now ${newStatus}`);
+      const nextStatus = await toggleEmployeeStatus(emp.employeeId || emp._id || emp.id);
+      const displayStatus = nextStatus || (emp.status === 'Active' ? 'Inactive' : 'Active');
+      toast.showSuccess(`${emp.name} is now ${displayStatus}`);
     } catch (err) {
-      toast.showError(err.message);
+      toast.showError(err.message || 'Failed to update employee status');
     }
   };
 
-  const handleChangePassword = (e) => {
+  const handleChangePassword = async (e) => {
     e.preventDefault();
     if (!newPassword || newPassword.length < 4) {
       toast.showError('Password must be at least 4 characters');
       return;
     }
     try {
-      changeEmployeePassword(passwordTarget.employeeId, newPassword);
-      toast.showSuccess(`Demo password updated for ${passwordTarget.name}`);
+      await changeEmployeePassword(passwordTarget.employeeId || passwordTarget._id || passwordTarget.id, newPassword);
+      toast.showSuccess(`Password updated successfully for ${passwordTarget.name}`);
       setPasswordTarget(null);
       setNewPassword('');
     } catch (err) {
-      toast.showError(err.message);
+      toast.showError(err.message || 'Failed to update password');
     }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      deleteEmployee(deleteTarget.employeeId);
-      toast.showSuccess(`Removed staff account for ${deleteTarget.name}`);
+      await deleteEmployee(deleteTarget.employeeId || deleteTarget._id || deleteTarget.id);
+      toast.showSuccess(`Staff account for ${deleteTarget.name} has been removed`);
       setDeleteTarget(null);
     } catch (err) {
-      toast.showError(err.message);
+      toast.showError(err.message || 'Failed to remove staff account');
     }
   };
 
@@ -393,7 +395,7 @@ export const EmployeesPermissions = () => {
         </div>
 
         {/* Quick Filter Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
           <button
             type="button"
             onClick={handleResetFilters}
@@ -454,8 +456,8 @@ export const EmployeesPermissions = () => {
           STREAMLINED STAFF TABLE (Generous Spacing, Clean & NO Clipping)
           ========================================================================= */}
       <div className="w-full bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="w-full overflow-x-auto no-scrollbar">
-          <table className="w-full text-left border-collapse text-xs">
+        <div className="w-full overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+          <table className="w-full min-w-[700px] lg:min-w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none">
                 <th className="py-3 px-4 text-black font-bold whitespace-nowrap">
@@ -683,15 +685,15 @@ export const EmployeesPermissions = () => {
         size="xl"
         footer={
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full">
-            <div className="flex items-center gap-2 text-xs font-bold text-black">
-              <ShieldCheck className="w-4 h-4 text-emerald-700 stroke-[2.5]" />
+            <div className="flex items-center gap-2 text-xs font-bold text-black text-center sm:text-left">
+              <ShieldCheck className="w-4 h-4 text-emerald-700 stroke-[2.5] shrink-0" />
               <span>Role-based access control with live session enforcement</span>
             </div>
-            <div className="flex items-center gap-2 self-end sm:self-auto">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
               <button
                 type="button"
                 onClick={() => setIsFormOpen(false)}
-                className="text-xs font-bold border border-slate-300 hover:border-black text-black px-4 py-2 rounded-lg cursor-pointer transition-colors bg-white hover:bg-slate-100"
+                className="flex-1 sm:flex-initial text-xs font-bold border border-slate-300 hover:border-black text-black px-4 py-2 rounded-lg cursor-pointer transition-colors bg-white hover:bg-slate-100"
               >
                 Cancel
               </button>
@@ -699,12 +701,12 @@ export const EmployeesPermissions = () => {
                 type="button"
                 onClick={handleSaveEmployee}
                 disabled={isSubmitting}
-                className="text-xs font-bold bg-[#1C9A58] hover:bg-[#158046] text-white px-5 py-2 rounded-lg cursor-pointer transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                className="flex-1 sm:flex-initial text-xs font-bold bg-[#1C9A58] hover:bg-[#158046] text-white px-5 py-2 rounded-lg cursor-pointer transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Saving Changes...</span>
+                    <span>Saving...</span>
                   </>
                 ) : (
                   <>
@@ -840,29 +842,34 @@ export const EmployeesPermissions = () => {
               <label className="block text-[11px] font-bold uppercase tracking-wider text-black mb-1.5">
                 Role
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-purple-700">
-                  <Shield className="w-4 h-4 stroke-[2.2]" />
-                </div>
-                <select
-                  value={formData.role}
-                  onChange={(e) => {
-                    const newRole = e.target.value;
-                    setFormData({
-                      ...formData,
-                      role: newRole,
-                      permissions:
-                        newRole === USER_ROLES.ADMIN
-                          ? DEFAULT_ADMIN_PERMISSIONS
-                          : DEFAULT_EMPLOYEE_PERMISSIONS,
-                    });
-                  }}
-                  className="w-full h-10 pl-9 pr-3 text-xs font-bold text-black bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1C9A58] cursor-pointer transition-colors"
-                >
-                  <option value={USER_ROLES.EMPLOYEE}>Employee</option>
-                  <option value={USER_ROLES.ADMIN}>Admin</option>
-                </select>
-              </div>
+              <FilterDropdown
+                value={formData.role}
+                onChange={(newRole) => {
+                  setFormData({
+                    ...formData,
+                    role: newRole,
+                    permissions:
+                      newRole === USER_ROLES.ADMIN
+                        ? DEFAULT_ADMIN_PERMISSIONS
+                        : DEFAULT_EMPLOYEE_PERMISSIONS,
+                  });
+                }}
+                options={[
+                  {
+                    label: 'Employee',
+                    value: USER_ROLES.EMPLOYEE,
+                    icon: <User className="w-3.5 h-3.5 text-blue-600" />,
+                  },
+                  {
+                    label: 'Admin',
+                    value: USER_ROLES.ADMIN,
+                    icon: <Shield className="w-3.5 h-3.5 text-purple-700" />,
+                  },
+                ]}
+                icon={<Shield className="w-4 h-4 stroke-[2.2] text-purple-700" />}
+                buttonClassName="h-10 text-xs font-bold text-black bg-slate-50 hover:bg-white focus:bg-white border-slate-300 rounded-lg"
+                className="w-full"
+              />
             </div>
 
             {/* Account Status */}
@@ -870,19 +877,25 @@ export const EmployeesPermissions = () => {
               <label className="block text-[11px] font-bold uppercase tracking-wider text-black mb-1.5">
                 Account Status
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-emerald-700">
-                  <Activity className="w-4 h-4 stroke-[2.2]" />
-                </div>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full h-10 pl-9 pr-3 text-xs font-bold text-black bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1C9A58] cursor-pointer transition-colors"
-                >
-                  <option value={EMPLOYEE_STATUS.ACTIVE}>Active</option>
-                  <option value={EMPLOYEE_STATUS.INACTIVE}>Inactive</option>
-                </select>
-              </div>
+              <FilterDropdown
+                value={formData.status}
+                onChange={(newStatus) => setFormData({ ...formData, status: newStatus })}
+                options={[
+                  {
+                    label: 'Active',
+                    value: EMPLOYEE_STATUS.ACTIVE,
+                    icon: <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block" />,
+                  },
+                  {
+                    label: 'Inactive',
+                    value: EMPLOYEE_STATUS.INACTIVE,
+                    icon: <span className="w-2 h-2 rounded-full bg-rose-600 inline-block" />,
+                  },
+                ]}
+                icon={<Activity className="w-4 h-4 stroke-[2.2] text-emerald-700" />}
+                buttonClassName="h-10 text-xs font-bold text-black bg-slate-50 hover:bg-white focus:bg-white border-slate-300 rounded-lg"
+                className="w-full"
+              />
             </div>
 
             {/* Phone Contact (Strict 13 chars starting with +92) */}
@@ -989,8 +1002,8 @@ export const EmployeesPermissions = () => {
             </div>
 
             {/* Matrix Table with Module Icons and Colorful Badges */}
-            <div className="overflow-x-auto rounded-lg border border-slate-300 bg-white shadow-2xs no-scrollbar">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto rounded-lg border border-slate-300 bg-white shadow-2xs no-scrollbar overscroll-x-contain touch-pan-x">
+              <table className="w-full min-w-[460px] sm:min-w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none">
                     <th className="py-2.5 px-3 whitespace-nowrap">Pharmacy Module</th>
@@ -1109,26 +1122,26 @@ export const EmployeesPermissions = () => {
               <button
                 type="button"
                 onClick={() => setViewingEmployee(null)}
-                className="text-xs font-bold border border-slate-300 hover:border-black text-black px-4 py-2 rounded-lg cursor-pointer transition-colors bg-white hover:bg-slate-100"
+                className="w-full sm:w-auto text-xs font-bold border border-slate-300 hover:border-black text-black px-5 py-2 rounded-lg cursor-pointer transition-colors bg-white hover:bg-slate-100 shadow-2xs"
               >
                 Close Profile
               </button>
             </div>
           }
         >
-          <div className="space-y-3.5 text-xs font-sans select-none">
+          <div className="space-y-3 text-xs font-sans select-none">
             {/* Header Card */}
-            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-300 flex items-center justify-between shadow-2xs">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-lg bg-emerald-100 text-[#1C9A58] border border-emerald-300 flex items-center justify-center font-black text-base shadow-2xs">
+            <div className="p-3 sm:p-3.5 rounded-xl bg-slate-50 border border-slate-300 flex items-center justify-between gap-2.5 shadow-2xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-emerald-100 text-[#1C9A58] border border-emerald-300 flex items-center justify-center font-black text-sm sm:text-base shadow-2xs shrink-0">
                   {viewingEmployee.name?.charAt(0) || 'U'}
                 </div>
-                <div>
-                  <h4 className="font-bold text-black text-sm">{viewingEmployee.name}</h4>
-                  <p className="text-black font-semibold font-mono text-xs mt-0.5">@{viewingEmployee.username}</p>
+                <div className="min-w-0">
+                  <h4 className="font-bold text-black text-xs sm:text-sm truncate">{viewingEmployee.name}</h4>
+                  <p className="text-black font-semibold font-mono text-[11px] sm:text-xs mt-0.5 truncate">@{viewingEmployee.username}</p>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-right shrink-0">
                 {viewingEmployee.role === USER_ROLES.ADMIN ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-950 border border-purple-300 shadow-2xs">
                     <Shield className="w-3 h-3 text-purple-700 stroke-[2.2]" /> Admin
@@ -1138,7 +1151,7 @@ export const EmployeesPermissions = () => {
                     Employee
                   </span>
                 )}
-                <p className="text-[11px] text-black font-bold mt-1">Status: {viewingEmployee.status}</p>
+                <p className="text-[10px] sm:text-[11px] text-black font-bold mt-1">Status: {viewingEmployee.status}</p>
               </div>
             </div>
 
@@ -1147,9 +1160,9 @@ export const EmployeesPermissions = () => {
               <span className="text-[10px] font-bold uppercase tracking-wider text-black block pb-1 border-b border-slate-200">
                 Contact & Account Details
               </span>
-              <p className="text-black font-semibold">Email: <strong className="text-black font-bold">{viewingEmployee.email || 'N/A'}</strong></p>
-              <p className="text-black font-semibold">Phone: <strong className="text-black font-bold">{viewingEmployee.phone || 'N/A'}</strong></p>
-              <p className="text-black font-semibold">Registered Date: <strong className="text-black font-bold">{new Date(viewingEmployee.createdAt || Date.now()).toLocaleDateString()}</strong></p>
+              <p className="text-black font-semibold break-all text-xs">Email: <strong className="text-black font-bold">{viewingEmployee.email || 'N/A'}</strong></p>
+              <p className="text-black font-semibold text-xs">Phone: <strong className="text-black font-bold">{viewingEmployee.phone || 'N/A'}</strong></p>
+              <p className="text-black font-semibold text-xs">Registered Date: <strong className="text-black font-bold">{new Date(viewingEmployee.createdAt || Date.now()).toLocaleDateString()}</strong></p>
             </div>
 
             {/* Permissions breakdown */}
@@ -1164,9 +1177,9 @@ export const EmployeesPermissions = () => {
                     : viewingEmployee.permissions?.[m.key] || {};
 
                   return (
-                    <div key={m.key} className="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0">
-                      <span className="font-bold text-black">{m.label}</span>
-                      <div className="flex items-center gap-1.5">
+                    <div key={m.key} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 py-1.5 border-b border-slate-100 last:border-0">
+                      <span className="font-bold text-black text-xs">{m.label}</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         {actionList.map((a) => (
                           <span
                             key={a.key}
@@ -1212,21 +1225,21 @@ export const EmployeesPermissions = () => {
           }
           size="sm"
           footer={
-            <div className="flex items-center justify-end gap-2 w-full">
+            <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2 w-full">
               <button
                 type="button"
                 onClick={() => {
                   setPasswordTarget(null);
                   setShowModalPassword(false);
                 }}
-                className="text-xs font-bold border border-slate-300 hover:border-black text-black px-4 py-2 rounded-lg cursor-pointer transition-colors bg-white hover:bg-slate-100"
+                className="w-full sm:w-auto text-xs font-bold border border-slate-300 hover:border-black text-black px-4 py-2.5 rounded-lg cursor-pointer transition-colors bg-white hover:bg-slate-100 flex items-center justify-center"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleChangePassword}
-                className="text-xs font-bold bg-[#1C9A58] hover:bg-[#158046] text-white px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-xs flex items-center gap-1.5"
+                className="w-full sm:w-auto text-xs font-bold bg-[#1C9A58] hover:bg-[#158046] text-white px-4 py-2.5 rounded-lg cursor-pointer transition-colors shadow-xs flex items-center justify-center gap-1.5"
               >
                 <CheckCircle2 className="w-4 h-4 stroke-[2.2]" />
                 <span>Update Password</span>

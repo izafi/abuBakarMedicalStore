@@ -50,8 +50,8 @@ export const MedicineTable = ({
 
   return (
     <div className="w-full bg-white rounded-xl border border-slate-300 shadow-xs overflow-hidden">
-      <div className="w-full">
-        <table className="w-full text-left border-collapse table-auto">
+      <div className="w-full overflow-x-auto">
+        <table className="w-full min-w-[760px] lg:min-w-full text-left border-collapse table-auto">
           <thead>
             <tr className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider">
               {/* ID */}
@@ -249,8 +249,8 @@ export const MedicineTable = ({
       </div>
 
       {/* Pagination & Rows-Per-Page Footer */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 border-t border-slate-300 text-xs text-black font-semibold">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-3 sm:px-4 py-2.5 bg-slate-50 border-t border-slate-300 text-xs text-black font-semibold">
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 sm:gap-3 text-center sm:text-left">
           <span>
             Showing <strong className="font-bold text-black">{(safePage - 1) * itemsPerPage + 1}</strong> to{' '}
             <strong className="font-bold text-black">{Math.min(safePage * itemsPerPage, sortedMedicines.length)}</strong> of{' '}
@@ -258,7 +258,7 @@ export const MedicineTable = ({
           </span>
 
           {/* Rows Per Page Selector (5, 10, 15, 20, 30, 50) */}
-          <div className="flex items-center gap-1.5 pl-3 border-l border-slate-300">
+          <div className="flex items-center gap-1.5 pl-2 sm:pl-3 border-l border-slate-300">
             <span className="text-[11px] text-black font-bold">Show</span>
             <select
               value={itemsPerPage}

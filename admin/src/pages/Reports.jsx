@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
+import FilterDropdown from '../components/common/FilterDropdown';
 import { useSales } from '../hooks/useSales';
 import { useInventory } from '../hooks/useInventory';
 import { useSettings } from '../hooks/useSettings';
@@ -48,6 +49,33 @@ export const Reports = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState('all'); // all, today, 7days, 30days, this_month
   const [categoryFilter, setCategoryFilter] = useState('all'); // all, sales, inventory
+
+  const reportOptions = useMemo(
+    () => [
+      { label: 'Sales & Financial Reports', isHeader: true },
+      ...REPORT_TYPES.filter((r) => r.category === 'sales').map((r) => ({
+        label: r.name,
+        value: r.id,
+      })),
+      { label: 'Inventory & Stock Audits', isHeader: true },
+      ...REPORT_TYPES.filter((r) => r.category === 'inventory').map((r) => ({
+        label: r.name,
+        value: r.id,
+      })),
+    ],
+    []
+  );
+
+  const dateRangeOptions = useMemo(
+    () => [
+      { label: 'All Available Records', value: 'all' },
+      { label: 'Today Only', value: 'today' },
+      { label: 'Last 7 Days', value: '7days' },
+      { label: 'Last 30 Days', value: '30days' },
+      { label: 'This Month', value: 'this_month' },
+    ],
+    []
+  );
 
   // High-level KPI summary calculations
   const kpiStats = useMemo(() => {
@@ -479,26 +507,14 @@ export const Reports = () => {
               <label className="block text-[11px] font-bold uppercase tracking-wider text-black mb-1">
                 Select Pharmacy Report
               </label>
-              <select
+              <FilterDropdown
                 value={activeReportId}
-                onChange={(e) => setActiveReportId(e.target.value)}
-                className="w-full h-10 px-3 text-xs sm:text-sm font-bold border border-slate-300 rounded-xl bg-slate-50 hover:bg-white focus:bg-white text-black shadow-xs focus:outline-none focus:border-[#1C9A58] focus:ring-2 focus:ring-[#1C9A58]/20 cursor-pointer transition-all"
-              >
-                <optgroup label="Sales & Financial Reports">
-                  {REPORT_TYPES.filter((r) => r.category === 'sales').map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Inventory & Stock Audits">
-                  {REPORT_TYPES.filter((r) => r.category === 'inventory').map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
+                onChange={(val) => setActiveReportId(val)}
+                options={reportOptions}
+                placeholder="Select Pharmacy Report"
+                buttonClassName="h-10 text-xs sm:text-sm font-bold bg-slate-50 hover:bg-white focus:bg-white border-slate-300 rounded-xl"
+                className="w-full"
+              />
             </div>
 
             {/* Date Filter */}
@@ -506,17 +522,14 @@ export const Reports = () => {
               <label className="block text-[11px] font-bold uppercase tracking-wider text-black mb-1">
                 Time Period Filter
               </label>
-              <select
+              <FilterDropdown
                 value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
-                className="w-full h-10 px-3 text-xs sm:text-sm font-bold border border-slate-300 rounded-xl bg-slate-50 hover:bg-white focus:bg-white text-black shadow-xs focus:outline-none focus:border-[#1C9A58] focus:ring-2 focus:ring-[#1C9A58]/20 cursor-pointer transition-all"
-              >
-                <option value="all">All Available Records</option>
-                <option value="today">Today Only</option>
-                <option value="7days">Last 7 Days</option>
-                <option value="30days">Last 30 Days</option>
-                <option value="this_month">This Month</option>
-              </select>
+                onChange={(val) => setDateRange(val)}
+                options={dateRangeOptions}
+                placeholder="Time Period Filter"
+                buttonClassName="h-10 text-xs sm:text-sm font-bold bg-slate-50 hover:bg-white focus:bg-white border-slate-300 rounded-xl"
+                className="w-full"
+              />
             </div>
 
             {/* Search within Report */}
@@ -624,8 +637,8 @@ export const Reports = () => {
       {/* 1. DAILY SALES REPORT */}
       {activeReportId === 'daily_sales' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Date</th>
@@ -664,8 +677,8 @@ export const Reports = () => {
       {/* 2. WEEKLY SALES REPORT */}
       {activeReportId === 'weekly_sales' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Week Period</th>
@@ -704,8 +717,8 @@ export const Reports = () => {
       {/* 3. MONTHLY SALES REPORT */}
       {activeReportId === 'monthly_sales' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Month</th>
@@ -742,8 +755,8 @@ export const Reports = () => {
       {/* 4. REVENUE REPORT */}
       {activeReportId === 'revenue' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Invoice #</th>
@@ -796,8 +809,8 @@ export const Reports = () => {
       {/* 5. BEST SELLING MEDICINES */}
       {activeReportId === 'best_selling' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Rank</th>
@@ -852,8 +865,8 @@ export const Reports = () => {
       {/* 6. TOTAL INVENTORY REPORT */}
       {activeReportId === 'total_inventory' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Medicine</th>
@@ -898,8 +911,8 @@ export const Reports = () => {
       {/* 7. LOW STOCK REPORT */}
       {activeReportId === 'low_stock' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Medicine</th>
@@ -947,8 +960,8 @@ export const Reports = () => {
       {/* 8. OUT OF STOCK REPORT */}
       {activeReportId === 'out_of_stock' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Medicine Name</th>
@@ -991,8 +1004,8 @@ export const Reports = () => {
       {/* 9. EXPIRED MEDICINES REPORT */}
       {activeReportId === 'expired' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Medicine</th>
@@ -1038,8 +1051,8 @@ export const Reports = () => {
       {/* 10. NEAR EXPIRY REPORT */}
       {activeReportId === 'near_expiry' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Medicine</th>
@@ -1087,8 +1100,8 @@ export const Reports = () => {
       {/* 11. MEDICINE-WISE SALES REPORT */}
       {activeReportId === 'medicine_sales' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Medicine</th>
@@ -1125,8 +1138,8 @@ export const Reports = () => {
       {/* 12. CATEGORY-WISE STOCK REPORT */}
       {activeReportId === 'category_stock' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Category Name</th>
@@ -1165,8 +1178,8 @@ export const Reports = () => {
       {/* 13. BATCH-WISE STOCK REPORT */}
       {activeReportId === 'batch_stock' && (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto no-scrollbar">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+            <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none sticky top-0 z-10">
                 <tr>
                   <th className="py-2.5 px-3">Batch #</th>

@@ -204,11 +204,6 @@ export const Settings = () => {
           </h1>
           <div className="flex items-center gap-2 flex-wrap mt-0.5 text-xs text-black font-semibold">
             <span>Configure store profile, inventory thresholds, and admin security</span>
-            <span className="text-slate-300">&bull;</span>
-            <span className="inline-flex items-center gap-1 font-bold text-[#1C9A58]">
-              <span className="w-2 h-2 rounded-full bg-[#1C9A58] animate-pulse"></span>
-              Live API Connected
-            </span>
           </div>
         </div>
 
@@ -217,7 +212,7 @@ export const Settings = () => {
           type="button"
           onClick={handleSaveSettings}
           disabled={isSaving || isSettingsLoading}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto ${
+          className={`w-full sm:w-auto justify-center px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer self-start sm:self-auto ${
             justSaved
               ? 'bg-emerald-600 hover:bg-emerald-700'
               : 'bg-[#1C9A58] hover:bg-[#0F3A2C]'
@@ -245,7 +240,7 @@ export const Settings = () => {
       {/* =========================================================================
           SLIM & CLEAN NAVIGATION TABS (Matching Site's Filter Pills & Font Size)
           ========================================================================= */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-1.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-1.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -468,7 +463,7 @@ export const Settings = () => {
             <button
               type="submit"
               disabled={isSaving}
-              className="px-3.5 py-2 rounded-lg text-xs font-bold text-white bg-[#1C9A58] hover:bg-[#0F3A2C] transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              className="w-full sm:w-auto justify-center px-4 py-2.5 rounded-lg text-xs font-bold text-white bg-[#1C9A58] hover:bg-[#0F3A2C] transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
               <span>Save Store Profile</span>
@@ -630,7 +625,7 @@ export const Settings = () => {
             <button
               type="submit"
               disabled={isSaving}
-              className="px-3.5 py-2 rounded-lg text-xs font-bold text-white bg-[#1C9A58] hover:bg-[#0F3A2C] transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+              className="w-full sm:w-auto justify-center px-4 py-2.5 rounded-lg text-xs font-bold text-white bg-[#1C9A58] hover:bg-[#0F3A2C] transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
               <span>Save Inventory Rules</span>
@@ -779,7 +774,7 @@ export const Settings = () => {
                 <button
                   type="submit"
                   disabled={isChangingPassword}
-                  className="px-3.5 py-2 rounded-lg text-xs font-bold text-white bg-[#1C9A58] hover:bg-[#0F3A2C] transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  className="w-full sm:w-auto justify-center px-4 py-2.5 rounded-lg text-xs font-bold text-white bg-[#1C9A58] hover:bg-[#0F3A2C] transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
                 >
                   {isChangingPassword ? (
                     <>
@@ -878,11 +873,11 @@ export const Settings = () => {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
               <button
                 type="button"
                 onClick={handleExportConfig}
-                className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-black text-xs font-bold shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-black text-xs font-bold shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5 text-black" />
                 <span>Export Configuration (JSON)</span>
@@ -893,7 +888,7 @@ export const Settings = () => {
                 onClick={() => {
                   window.location.reload();
                 }}
-                className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-black text-xs font-bold shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-black text-xs font-bold shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5 text-black" />
                 <span>Reload Application Cache</span>
@@ -928,7 +923,7 @@ export const Settings = () => {
               <button
                 type="button"
                 onClick={handleFactoryReset}
-                className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 self-start sm:self-auto"
+                className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Reset Database</span>

@@ -14,6 +14,7 @@ import {
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { SearchBar } from '../components/common/SearchBar';
+import { FilterDropdown } from '../components/common/FilterDropdown';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { MedicineForm } from '../components/medicines/MedicineForm';
 import { MedicineTable } from '../components/medicines/MedicineTable';
@@ -47,6 +48,23 @@ export const MedicinesManagement = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedType, setSelectedType] = useState('All');
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'cards'
+
+  // Category & Type Options for responsive FilterDropdown
+  const categoryOptions = useMemo(
+    () => [
+      { value: 'All', label: `All Categories (${categories.length})` },
+      ...categories.map((c) => ({ value: c, label: c })),
+    ],
+    [categories]
+  );
+
+  const typeOptions = useMemo(
+    () => [
+      { value: 'All', label: 'All Types' },
+      ...MEDICINE_TYPES.map((t) => ({ value: t, label: t })),
+    ],
+    []
+  );
 
   // Modals
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -287,32 +305,23 @@ export const MedicinesManagement = () => {
 
           <div className="flex items-center gap-2 w-full lg:w-auto">
             {/* Category Filter */}
-            <select
+            <FilterDropdown
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="h-9 px-3 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-black font-bold focus:outline-none focus:border-black min-w-[140px] cursor-pointer transition-colors"
-            >
-              <option value="All">All Categories ({categories.length})</option>
-              {categories.map((c, idx) => (
-                <option key={idx} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedCategory(val)}
+              options={categoryOptions}
+              placeholder={`All Categories (${categories.length})`}
+              className="flex-1 lg:flex-none min-w-0 sm:min-w-[150px]"
+            />
 
             {/* Type Filter */}
-            <select
+            <FilterDropdown
               value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-              className="h-9 px-3 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-black font-bold focus:outline-none focus:border-black min-w-[110px] cursor-pointer transition-colors"
-            >
-              <option value="All">All Types</option>
-              {MEDICINE_TYPES.map((t, idx) => (
-                <option key={idx} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedType(val)}
+              options={typeOptions}
+              placeholder="All Types"
+              align="right"
+              className="flex-1 lg:flex-none min-w-0 sm:min-w-[110px]"
+            />
 
             {/* View Mode Toggle: Table or Grid */}
             <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-300 shrink-0">
@@ -427,18 +436,18 @@ export const MedicinesManagement = () => {
             setIsFormOpen(true);
           }}
           onAddBatch={handleAddBatch}
-          onUpdateBatch={(batchId, batchData, reason) => {
+          onUpdateBatch={async (batchId, batchData, reason) => {
             try {
-              updateBatch(batchId, batchData, reason);
+              await updateBatch(batchId, batchData, reason);
               toast.showSuccess('Batch updated successfully!');
             } catch (err) {
               toast.showError(err.message);
             }
           }}
           onDeleteBatch={handleDeleteBatch}
-          onAdjustStock={({ batchId, delta, actionType, reason }) => {
+          onAdjustStock={async ({ batchId, delta, actionType, reason }) => {
             try {
-              adjustBatchStock(batchId, delta, actionType, reason);
+              await adjustBatchStock(batchId, delta, actionType, reason);
               toast.showSuccess('Stock adjustment applied successfully!');
             } catch (err) {
               toast.showError(err.message);

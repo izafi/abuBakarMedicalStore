@@ -33,12 +33,13 @@ export const ConfirmDialog = ({
       size="sm"
       closeOnBackdrop={!loading}
       footer={
-        <>
+        <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2 w-full">
           <Button
             variant="outline"
             size="md"
             onClick={onClose}
             disabled={loading}
+            className="w-full sm:w-auto"
           >
             {cancelText}
           </Button>
@@ -47,10 +48,11 @@ export const ConfirmDialog = ({
             size="md"
             onClick={onConfirm}
             loading={loading}
+            className="w-full sm:w-auto"
           >
             {confirmText}
           </Button>
-        </>
+        </div>
       }
     >
       <div className="flex items-start gap-4">

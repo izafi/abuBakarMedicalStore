@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Eye,
   Printer,
@@ -23,14 +23,22 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { InvoiceModal } from '../components/common/InvoiceModal';
+import FilterDropdown from '../components/common/FilterDropdown';
 import { useSales } from '../hooks/useSales';
 import { useAuth } from '../hooks/useAuth';
 import { formatCurrency, formatDate } from '../utils/formatters';
 
 export const SalesHistory = () => {
   const navigate = useNavigate();
-  const { sales } = useSales();
+  const { sales, refreshSales } = useSales();
   const { users } = useAuth();
+
+  // Instantly ensure latest sales records on mount without needing refresh
+  useEffect(() => {
+    if (refreshSales) {
+      refreshSales();
+    }
+  }, [refreshSales]);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,6 +47,37 @@ export const SalesHistory = () => {
   const [paymentFilter, setPaymentFilter] = useState('all'); // all, Cash, Card
   const [sortField, setSortField] = useState('date'); // date, grandTotal, invoiceNumber
   const [sortOrder, setSortOrder] = useState('desc'); // desc (newest), asc (oldest)
+
+  // Options for custom FilterDropdowns
+  const employeeOptions = useMemo(
+    () => [
+      { label: 'All Employees', value: 'all' },
+      ...users.map((u) => ({
+        label: `${u.name} (${u.role})`,
+        value: u.name,
+      })),
+    ],
+    [users]
+  );
+
+  const dateRangeOptions = useMemo(
+    () => [
+      { label: 'All Dates', value: 'all' },
+      { label: "Today's Sales", value: 'today' },
+      { label: 'Last 7 Days', value: 'week' },
+      { label: 'This Month', value: 'month' },
+    ],
+    []
+  );
+
+  const paymentOptions = useMemo(
+    () => [
+      { label: 'All Payments', value: 'all' },
+      { label: 'Cash Only', value: 'Cash' },
+      { label: 'Card Only', value: 'Card' },
+    ],
+    []
+  );
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -195,7 +234,7 @@ export const SalesHistory = () => {
 
         <button
           type="button"
-          onClick={() => navigate('/counter')}
+          onClick={() => navigate('/pos')}
           className="bg-[#1C9A58] hover:bg-[#158046] text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -339,53 +378,44 @@ export const SalesHistory = () => {
             )}
           </div>
 
-          {/* Filter Dropdowns */}
-          <div className="flex items-center gap-1.5 w-full sm:w-auto flex-wrap">
+          {/* Filter Dropdowns - 2x2 grid on mobile/small screens, inline flex on desktop */}
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 w-full sm:w-auto">
             {/* Employee Filter */}
-            <select
+            <FilterDropdown
               value={employeeFilter}
-              onChange={(e) => {
-                setEmployeeFilter(e.target.value);
+              onChange={(val) => {
+                setEmployeeFilter(val);
                 setCurrentPage(1);
               }}
-              className="h-9 px-3 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-black font-bold focus:outline-none focus:border-black cursor-pointer transition-colors"
-            >
-              <option value="all">All Employees</option>
-              {users.map((u) => (
-                <option key={u.id || u.employeeId} value={u.name}>
-                  {u.name} ({u.role})
-                </option>
-              ))}
-            </select>
+              options={employeeOptions}
+              placeholder="All Employees"
+              className="w-full sm:w-auto min-w-[130px]"
+            />
 
             {/* Date Range Filter */}
-            <select
+            <FilterDropdown
               value={dateRangeFilter}
-              onChange={(e) => {
-                setDateRangeFilter(e.target.value);
+              onChange={(val) => {
+                setDateRangeFilter(val);
                 setCurrentPage(1);
               }}
-              className="h-9 px-3 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-black font-bold focus:outline-none focus:border-black cursor-pointer transition-colors"
-            >
-              <option value="all">All Dates</option>
-              <option value="today">Today's Sales</option>
-              <option value="week">Last 7 Days</option>
-              <option value="month">This Month</option>
-            </select>
+              options={dateRangeOptions}
+              placeholder="All Dates"
+              className="w-full sm:w-auto min-w-[120px]"
+            />
 
             {/* Payment Filter */}
-            <select
+            <FilterDropdown
               value={paymentFilter}
-              onChange={(e) => {
-                setPaymentFilter(e.target.value);
+              onChange={(val) => {
+                setPaymentFilter(val);
                 setCurrentPage(1);
               }}
-              className="h-9 px-3 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-black font-bold focus:outline-none focus:border-black cursor-pointer transition-colors"
-            >
-              <option value="all">All Payments</option>
-              <option value="Cash">Cash Only</option>
-              <option value="Card">Card Only</option>
-            </select>
+              options={paymentOptions}
+              placeholder="All Payments"
+              align="left"
+              className="w-full sm:w-auto min-w-[120px]"
+            />
 
             {/* Sort Order Toggle */}
             <button
@@ -393,7 +423,7 @@ export const SalesHistory = () => {
               onClick={() => {
                 setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
               }}
-              className="h-9 px-3 text-xs border border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-center gap-1.5 font-bold text-black transition-colors cursor-pointer shrink-0"
+              className="w-full sm:w-auto h-9 px-3 text-xs border border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center justify-center gap-1.5 font-bold text-black transition-colors cursor-pointer shrink-0 shadow-2xs"
               title={`Sorted by: ${sortOrder === 'desc' ? 'Newest / Highest' : 'Oldest / Lowest'}`}
             >
               <ArrowUpDown className="w-3.5 h-3.5 text-black stroke-[2.2]" />
@@ -403,9 +433,9 @@ export const SalesHistory = () => {
         </div>
 
         {/* Quick Filter Chips & Reset Ribbon */}
-        <div className="flex items-center justify-between gap-2 flex-wrap pt-1 border-t border-slate-200 text-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-slate-200 text-xs">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-bold text-black uppercase tracking-wider">Quick:</span>
+            <span className="text-[10px] font-bold text-black uppercase tracking-wider shrink-0">Quick:</span>
             {[
               { label: 'All Invoices', action: () => handleResetFilters(), active: dateRangeFilter === 'all' && paymentFilter === 'all' && !searchQuery },
               { label: "Today's Sales", action: () => { setDateRangeFilter('today'); setCurrentPage(1); }, active: dateRangeFilter === 'today' },
@@ -416,7 +446,7 @@ export const SalesHistory = () => {
                 key={idx}
                 type="button"
                 onClick={chip.action}
-                className={`px-2 py-0.5 rounded-md text-[11px] font-bold border transition-all cursor-pointer ${
+                className={`px-2 py-0.5 rounded-md text-[11px] font-bold border transition-all cursor-pointer whitespace-nowrap ${
                   chip.active
                     ? 'bg-black text-white border-black shadow-2xs'
                     : 'bg-slate-50 text-black border-slate-300 hover:border-black hover:bg-slate-100'
@@ -431,7 +461,7 @@ export const SalesHistory = () => {
             <button
               type="button"
               onClick={handleResetFilters}
-              className="text-xs text-rose-600 hover:text-rose-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+              className="text-xs text-rose-600 hover:text-rose-700 hover:underline font-bold flex items-center gap-1 cursor-pointer self-start sm:self-auto"
             >
               <RotateCcw className="w-3 h-3 stroke-[2.2]" />
               <span>Reset Filters</span>
@@ -444,14 +474,14 @@ export const SalesHistory = () => {
           MAIN SALES TABLE (Matching Medicine Counter & Inventory Standards)
           ========================================================================= */}
       <div className="w-full bg-white rounded-xl border border-slate-300 shadow-xs overflow-hidden">
-        <div className="w-full overflow-x-auto no-scrollbar">
-          <table className="w-full text-left border-collapse table-auto text-xs">
+        <div className="w-full overflow-x-auto no-scrollbar overscroll-x-contain touch-pan-x">
+          <table className="w-full min-w-[780px] lg:min-w-full text-left border-collapse table-auto text-xs">
             <thead>
               <tr className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none">
                 {/* 1. Invoice */}
                 <th
                   onClick={() => handleSort('invoiceNumber')}
-                  className="py-2 px-2.5 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                  className="py-2.5 px-3 cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
                 >
                   <div className="flex items-center gap-1 text-black font-bold">
                     <span>Invoice</span>
@@ -459,44 +489,39 @@ export const SalesHistory = () => {
                   </div>
                 </th>
 
-                {/* 2. Customer / Doctor */}
-                <th className="py-2 px-2 text-black font-bold whitespace-nowrap">
-                  <span>Customer / Dr.</span>
+                {/* 2. Customer */}
+                <th className="py-2.5 px-3 text-black font-bold whitespace-nowrap">
+                  <span>Customer</span>
                 </th>
 
                 {/* 3. Medicines */}
-                <th className="py-2 px-2 text-black font-bold whitespace-nowrap">
-                  <span>Medicines</span>
+                <th className="py-2.5 px-3 text-black font-bold whitespace-nowrap">
+                  <span>Medicines Dispensed</span>
                 </th>
 
-                {/* 4. Subtotal / Discount */}
-                <th className="py-2 px-2 text-right text-black font-bold whitespace-nowrap">
-                  <span>Subtotal / Disc</span>
-                </th>
-
-                {/* 5. Amount */}
+                {/* 4. Total Amount */}
                 <th
                   onClick={() => handleSort('grandTotal')}
-                  className="py-2 px-2 text-right cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
+                  className="py-2.5 px-3 text-right cursor-pointer hover:bg-slate-200/60 select-none whitespace-nowrap"
                 >
                   <div className="flex items-center justify-end gap-1 text-black font-bold">
-                    <span>Amount</span>
+                    <span>Total Amount</span>
                     <ArrowUpDown className="w-3 h-3 text-black shrink-0 stroke-[2.2]" />
                   </div>
                 </th>
 
-                {/* 6. Payment */}
-                <th className="py-2 px-1.5 text-center text-black font-bold whitespace-nowrap">
+                {/* 5. Payment */}
+                <th className="py-2.5 px-2 text-center text-black font-bold whitespace-nowrap">
                   <span>Payment</span>
                 </th>
 
-                {/* 7. Cashier */}
-                <th className="py-2 px-2 text-black font-bold whitespace-nowrap">
+                {/* 6. Cashier */}
+                <th className="py-2.5 px-3 text-black font-bold whitespace-nowrap">
                   <span>Cashier</span>
                 </th>
 
-                {/* 8. Actions */}
-                <th className="py-2 px-2 text-right text-black font-bold whitespace-nowrap">
+                {/* 7. Actions */}
+                <th className="py-2.5 px-3 text-right text-black font-bold whitespace-nowrap">
                   <span>Actions</span>
                 </th>
               </tr>
@@ -505,7 +530,7 @@ export const SalesHistory = () => {
             <tbody className="divide-y divide-slate-200 text-xs bg-white">
               {paginatedSales.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-black">
+                  <td colSpan={7} className="py-12 text-center text-black">
                     <Receipt className="w-8 h-8 mx-auto mb-2 text-neutral-400 stroke-[1.8]" />
                     <p className="font-bold text-black text-sm">No sales invoices found</p>
                     <p className="text-xs text-black font-medium mt-0.5">
@@ -534,74 +559,70 @@ export const SalesHistory = () => {
                       className="hover:bg-slate-50 transition-colors cursor-pointer group"
                     >
                       {/* 1. Invoice & Timestamp */}
-                      <td className="py-2 px-2.5">
-                        <span className="font-mono font-bold text-black text-xs group-hover:text-[#1C9A58] transition-colors block">
+                      <td className="py-2.5 px-3">
+                        <span className="font-mono font-bold text-[#1C9A58] group-hover:underline text-xs block">
                           {s.invoiceNumber}
                         </span>
-                        <div className="text-[11px] text-black font-semibold mt-0.5 whitespace-nowrap">
+                        <div className="text-[11px] text-slate-500 font-medium mt-0.5 whitespace-nowrap">
                           <span>{formatDate(s.date)}</span>
                           <span className="mx-1">&bull;</span>
                           <span>{new Date(s.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                       </td>
 
-                      {/* 2. Customer & Doctor */}
-                      <td className="py-2 px-2">
-                        <div className="space-y-0.5">
-                          <p className="font-bold text-black text-xs truncate max-w-[140px]">
-                            {s.patientName || s.customerName || 'Walk-in'}
+                      {/* 2. Customer */}
+                      <td className="py-2.5 px-3">
+                        <p className="font-bold text-black text-xs truncate max-w-[150px]">
+                          {s.patientName || s.customerName || 'Walk-in Customer'}
+                        </p>
+                        {s.doctorName && !['self', 'self / counter', 'counter', 'n/a', ''].includes(s.doctorName.toLowerCase().trim()) ? (
+                          <p className="text-[11px] text-emerald-700 font-semibold truncate max-w-[150px] mt-0.5">
+                            Dr. {s.doctorName.replace(/^dr\.?\s*/i, '')}
                           </p>
-                          <p className="text-[11px] text-black font-semibold truncate max-w-[140px]">
-                            {s.doctorName || 'Self'}
+                        ) : (
+                          <p className="text-[10px] text-slate-400 font-medium truncate max-w-[150px] mt-0.5">
+                            Counter Sale
                           </p>
-                        </div>
+                        )}
                       </td>
 
-                      {/* 3. Medicines */}
-                      <td className="py-2 px-2">
-                        <div className="space-y-0.5 max-w-[180px]">
-                          <div className="text-xs font-bold text-black truncate">
+                      {/* 3. Medicines Dispensed */}
+                      <td className="py-2.5 px-3">
+                        <div className="space-y-0.5 max-w-[200px]">
+                          <p className="text-xs font-bold text-black truncate">
                             {firstTwo.map((i) => i.medicineName || i.name).join(', ')}
                             {remaining > 0 && (
-                              <span className="text-[10px] text-black font-bold ml-1 bg-slate-100 px-1 py-0.2 rounded border border-slate-300">
-                                +{remaining} more
+                              <span className="text-[10px] text-slate-600 font-bold ml-1 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                +{remaining}
                               </span>
                             )}
-                          </div>
-                          <div className="text-[11px] text-black font-semibold">
-                            <span>
-                              {itemCount} item{itemCount > 1 ? 's' : ''} &bull;{' '}
-                              <strong className="text-black font-bold">{totalQty} units</strong>
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* 4. Subtotal / Discount (Without Rs.) */}
-                      <td className="py-2 px-2 text-right">
-                        <div className="text-xs space-y-0.5">
-                          <p className="font-mono text-black font-bold">
-                            {Number(s.subtotal || 0).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
-                          {s.discountAmount > 0 ? (
-                            <p className="font-mono text-[11px] text-emerald-700 font-bold">
-                              -{Number(s.discountAmount || 0).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                          ) : (
-                            <p className="font-mono text-[10px] text-black font-bold">-</p>
-                          )}
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            <span>{itemCount} {itemCount === 1 ? 'item' : 'items'}</span>
+                            <span className="mx-1">&bull;</span>
+                            <span className="font-semibold text-slate-700">{totalQty} units</span>
+                          </p>
                         </div>
                       </td>
 
-                      {/* 5. Amount (Without Rs.) */}
-                      <td className="py-2 px-2 text-right">
-                        <span className="font-mono font-black text-xs text-[#0F3A2C] bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300 inline-block shadow-2xs">
+                      {/* 4. Total Amount (Clean & Consolidated) */}
+                      <td className="py-2.5 px-3 text-right">
+                        <span className="font-mono font-black text-sm text-black block tabular-nums">
                           {Number(s.grandTotal || 0).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
+                        {Number(s.discountAmount) > 0 ? (
+                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 inline-block mt-0.5">
+                            Save {Number(s.discountAmount).toLocaleString('en-PK', { minimumFractionDigits: 2 })}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
+                            No discount
+                          </span>
+                        )}
                       </td>
 
-                      {/* 6. Payment Badge */}
-                      <td className="py-2 px-1.5 text-center">
+                      {/* 5. Payment Badge */}
+                      <td className="py-2.5 px-2 text-center">
                         {s.paymentMethod === 'Card' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-950 border border-blue-300 shadow-2xs whitespace-nowrap">
                             <CreditCard className="w-3 h-3 text-blue-800 stroke-[2.2]" />
@@ -615,32 +636,27 @@ export const SalesHistory = () => {
                         )}
                       </td>
 
-                      {/* 7. Cashier */}
-                      <td className="py-2 px-2">
-                        <div className="text-xs">
-                          <p className="font-bold text-black">{s.employeeName || s.cashierName || 'Staff'}</p>
-                          {s.employeeId && !/^[0-9a-fA-F]{24}$/.test(s.employeeId) ? (
-                            <p className="text-[10px] text-black font-semibold mt-0.5 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 inline-block">
-                              {s.employeeId}
-                            </p>
-                          ) : s.employeeUsername ? (
-                            <p className="text-[10px] text-black font-semibold mt-0.5 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 inline-block">
-                              @{s.employeeUsername}
-                            </p>
-                          ) : null}
-                        </div>
+                      {/* 6. Cashier */}
+                      <td className="py-2.5 px-3">
+                        <p className="font-bold text-black text-xs capitalize">
+                          {s.employeeName || s.cashierName || 'Staff'}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                          {s.employeeRole || (s.employeeName?.toLowerCase().includes('admin') || s.cashierName?.toLowerCase().includes('admin') ? 'Admin' : 'Cashier')}
+                        </p>
                       </td>
 
-                      {/* 8. Actions */}
-                      <td className="py-2 px-2 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
+                      {/* 7. Actions */}
+                      <td className="py-2.5 px-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => setSelectedInvoice(s)}
-                            className="w-7 h-7 flex items-center justify-center text-black hover:text-[#1C9A58] hover:bg-emerald-50 rounded-md border border-slate-300 hover:border-emerald-600 transition-colors shadow-2xs cursor-pointer shrink-0"
+                            className="h-7 px-2 flex items-center gap-1 text-slate-700 hover:text-[#1C9A58] hover:bg-emerald-50 rounded-md border border-slate-200 hover:border-emerald-300 transition-colors shadow-2xs cursor-pointer text-xs font-semibold"
                             title="View invoice details"
                           >
-                            <Eye className="w-3.5 h-3.5 stroke-[2.2]" />
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View</span>
                           </button>
 
                           <button
@@ -649,7 +665,7 @@ export const SalesHistory = () => {
                               setSelectedInvoice(s);
                               setTimeout(() => window.print(), 300);
                             }}
-                            className="w-7 h-7 flex items-center justify-center text-black hover:text-black hover:bg-slate-100 rounded-md border border-slate-300 hover:border-black transition-colors shadow-2xs cursor-pointer shrink-0"
+                            className="w-7 h-7 flex items-center justify-center text-slate-600 hover:text-black hover:bg-slate-100 rounded-md border border-slate-200 hover:border-slate-400 transition-colors shadow-2xs cursor-pointer"
                             title="Print receipt"
                           >
                             <Printer className="w-3.5 h-3.5 stroke-[2.2]" />
@@ -669,7 +685,7 @@ export const SalesHistory = () => {
             ========================================================================= */}
         <div className="px-3.5 py-2.5 border-t border-slate-300 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs select-none">
           {/* Showing Count */}
-          <div className="text-black font-bold text-xs flex items-center gap-2">
+          <div className="text-black font-bold text-xs flex items-center gap-2 text-center sm:text-left">
             <span>
               Showing{' '}
               <strong className="text-black font-black">
@@ -684,7 +700,7 @@ export const SalesHistory = () => {
           </div>
 
           {/* Page Controls & Page Size */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-black font-bold">Show</span>
               <select
@@ -717,7 +733,7 @@ export const SalesHistory = () => {
                 <span className="hidden sm:inline">Prev</span>
               </button>
 
-              <span className="text-xs font-bold text-black px-2">
+              <span className="text-xs font-bold text-black px-1.5 sm:px-2 whitespace-nowrap">
                 Page {safePage} of {totalPages}
               </span>
 

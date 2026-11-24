@@ -114,8 +114,8 @@ export const BatchTable = ({
 
   return (
     <div className="w-full bg-white rounded-xl border border-slate-300 shadow-xs overflow-hidden font-sans">
-      <div className="w-full overflow-x-auto no-scrollbar">
-        <table className="w-full text-left border-collapse table-auto text-xs">
+      <div className="w-full overflow-x-auto overscroll-x-contain touch-pan-x">
+        <table className="w-full min-w-[780px] lg:min-w-full text-left border-collapse table-auto text-xs">
           <thead>
             <tr className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none">
               {showMedicineCol && (
@@ -372,8 +372,8 @@ export const BatchTable = ({
       </div>
 
       {/* Pagination & Rows-Per-Page Footer (Matching Medicine Counter) */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 border-t border-slate-300 text-xs text-black font-semibold select-none">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-3 sm:px-4 py-2.5 bg-slate-50 border-t border-slate-300 text-xs text-black font-semibold">
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 sm:gap-3 text-center sm:text-left">
           <span>
             Showing <strong className="font-bold text-black">{(safePage - 1) * itemsPerPage + 1}</strong> to{' '}
             <strong className="font-bold text-black">{Math.min(safePage * itemsPerPage, sortedBatches.length)}</strong> of{' '}
@@ -381,7 +381,7 @@ export const BatchTable = ({
           </span>
 
           {/* Rows Per Page Selector */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 pl-2 sm:pl-3 border-l border-slate-300">
             <span className="text-black font-bold text-xs">Show</span>
             <select
               value={itemsPerPage}

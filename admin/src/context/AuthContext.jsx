@@ -238,7 +238,7 @@ export const AuthProvider = ({ children }) => {
       const target = users.find(
         (u) => u.employeeId === employeeId || u.id === employeeId || u._id === employeeId
       );
-      if (!target) return;
+      if (!target) return null;
 
       if (
         target.role === USER_ROLES.ADMIN &&
@@ -249,17 +249,24 @@ export const AuthProvider = ({ children }) => {
       }
 
       const targetId = target._id || target.id || employeeId;
+      let resultingStatus =
+        target.status === EMPLOYEE_STATUS.ACTIVE
+          ? EMPLOYEE_STATUS.INACTIVE
+          : EMPLOYEE_STATUS.ACTIVE;
+
       try {
-        await employeeService.toggleStatus(targetId);
+        const res = await employeeService.toggleStatus(targetId);
         await fetchEmployees();
+        if (res?.data?.status) {
+          resultingStatus = res.data.status;
+        } else if (res?.status && typeof res.status === 'string') {
+          resultingStatus = res.status;
+        }
       } catch (err) {
         console.warn('[AuthContext] API employee toggle status warning:', err.message);
-        const newStatus =
-          target.status === EMPLOYEE_STATUS.ACTIVE
-            ? EMPLOYEE_STATUS.INACTIVE
-            : EMPLOYEE_STATUS.ACTIVE;
-        await updateEmployee(employeeId, { status: newStatus });
+        await updateEmployee(employeeId, { status: resultingStatus });
       }
+      return resultingStatus;
     },
     [users, updateEmployee, fetchEmployees]
   );

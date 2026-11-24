@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Pill,
@@ -25,6 +25,7 @@ import {
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
 import { SearchBar } from '../components/common/SearchBar';
+import { FilterDropdown } from '../components/common/FilterDropdown';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { MedicineDetails } from '../components/medicines/MedicineDetails';
 import { MedicineForm } from '../components/medicines/MedicineForm';
@@ -50,10 +51,17 @@ export const MedicineCounter = () => {
     updateBatch,
     deleteBatch,
     adjustBatchStock,
+    refreshInventory,
   } = useInventory();
-  const { addToCart, orderSummary, recentSales } = useSales();
+  const { addToCart, orderSummary, recentSales, refreshSales } = useSales();
   const { currentUser, hasPermission } = useAuth();
   const toast = useToast();
+
+  // Instantly keep counter sales and inventory in sync without refresh
+  useEffect(() => {
+    if (refreshSales) refreshSales();
+    if (refreshInventory) refreshInventory();
+  }, [refreshSales, refreshInventory]);
 
   // Permissions
   const canAddSale = hasPermission('sales', 'add');
@@ -83,6 +91,23 @@ export const MedicineCounter = () => {
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(30);
+
+  // Category & Type Options for custom bounded FilterDropdown
+  const categoryOptions = useMemo(
+    () => [
+      { value: 'All', label: `All Categories (${categories.length})` },
+      ...categories.map((c) => ({ value: c, label: c })),
+    ],
+    [categories]
+  );
+
+  const typeOptions = useMemo(
+    () => [
+      { value: 'All', label: 'All Types' },
+      ...MEDICINE_TYPES.map((t) => ({ value: t, label: t })),
+    ],
+    []
+  );
 
   // Handle Sort
   const handleSort = (field) => {
@@ -259,15 +284,15 @@ export const MedicineCounter = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
           {/* Active Bill / POS Quick Counter Link */}
           <button
             type="button"
             onClick={() => navigate('/pos')}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 text-[#0F3A2C] transition-all font-bold text-xs shadow-2xs cursor-pointer"
+            className="flex-1 sm:flex-none justify-center flex items-center gap-2 px-3 sm:px-3.5 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-300 text-[#0F3A2C] transition-all font-bold text-xs shadow-2xs cursor-pointer whitespace-nowrap"
             title="Go to POS Billing Counter"
           >
-            <div className="relative">
+            <div className="relative shrink-0">
               <ShoppingCart className="w-4 h-4 text-[#1C9A58]" />
               {orderSummary.totalItems > 0 && (
                 <span className="absolute -top-1.5 -right-2 w-4 h-4 rounded-full bg-[#1C9A58] text-white text-[9px] font-black flex items-center justify-center">
@@ -278,7 +303,7 @@ export const MedicineCounter = () => {
             <span>
               Active Bill: <strong>{formatCurrency(orderSummary.grandTotal)}</strong>
             </span>
-            <ArrowRight className="w-3.5 h-3.5 text-black" />
+            <ArrowRight className="w-3.5 h-3.5 text-black shrink-0" />
           </button>
 
           {/* Add New Medicine (if has permission) */}
@@ -290,7 +315,7 @@ export const MedicineCounter = () => {
                 setEditingMedicine(null);
                 setIsFormOpen(true);
               }}
-              className="bg-[#1C9A58] hover:bg-[#158046] text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              className="flex-1 sm:flex-none justify-center bg-[#1C9A58] hover:bg-[#158046] text-white font-bold text-xs px-3 sm:px-3.5 py-2 rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
               Add New Medicine
             </Button>
@@ -317,38 +342,29 @@ export const MedicineCounter = () => {
 
           <div className="flex items-center gap-2 w-full lg:w-auto">
             {/* Category Filter */}
-            <select
+            <FilterDropdown
               value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
+              onChange={(val) => {
+                setSelectedCategory(val);
                 setCurrentPage(1);
               }}
-              className="h-9 px-3 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-black font-bold focus:outline-none focus:border-black min-w-[140px] cursor-pointer transition-colors"
-            >
-              <option value="All">All Categories ({categories.length})</option>
-              {categories.map((c, idx) => (
-                <option key={idx} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+              options={categoryOptions}
+              placeholder={`All Categories (${categories.length})`}
+              className="flex-1 lg:flex-none min-w-0 sm:min-w-[150px]"
+            />
 
             {/* Type Filter */}
-            <select
+            <FilterDropdown
               value={selectedType}
-              onChange={(e) => {
-                setSelectedType(e.target.value);
+              onChange={(val) => {
+                setSelectedType(val);
                 setCurrentPage(1);
               }}
-              className="h-9 px-3 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-black font-bold focus:outline-none focus:border-black min-w-[110px] cursor-pointer transition-colors"
-            >
-              <option value="All">All Types</option>
-              {MEDICINE_TYPES.map((t, idx) => (
-                <option key={idx} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+              options={typeOptions}
+              placeholder="All Types"
+              align="right"
+              className="flex-1 lg:flex-none min-w-0 sm:min-w-[110px]"
+            />
 
             {/* View Mode Toggle: Table or Grid */}
             <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-300 shrink-0">
@@ -407,8 +423,8 @@ export const MedicineCounter = () => {
           ========================================================================= */}
       {viewMode === 'table' ? (
         <div className="w-full bg-white rounded-xl border border-slate-300 shadow-xs overflow-hidden">
-          <div className="w-full overflow-x-auto no-scrollbar">
-            <table className="w-full text-left border-collapse table-auto">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[780px] lg:min-w-full text-left border-collapse table-auto">
               <thead>
                 <tr className="bg-slate-100/90 border-b border-slate-300 text-[11px] font-bold text-black uppercase tracking-wider select-none">
                   {/* 1. Name */}
@@ -687,8 +703,8 @@ export const MedicineCounter = () => {
           </div>
 
           {/* Pagination & Rows-Per-Page Footer */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 border-t border-slate-300 text-xs text-black font-semibold">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-3 sm:px-4 py-2.5 bg-slate-50 border-t border-slate-300 text-xs text-black font-semibold">
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 sm:gap-3 text-center sm:text-left">
               <span>
                 Showing <strong className="font-bold text-black">{(safePage - 1) * itemsPerPage + 1}</strong> to{' '}
                 <strong className="font-bold text-black">{Math.min(safePage * itemsPerPage, sortedMedicines.length)}</strong> of{' '}
@@ -716,7 +732,7 @@ export const MedicineCounter = () => {
             </div>
 
             {/* Pagination Controls */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center justify-center gap-1">
               <button
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -765,27 +781,27 @@ export const MedicineCounter = () => {
           RECENT COUNTER MEDICINE SALES (Bottom Section)
           ========================================================================= */}
       <div className="bg-white rounded-xl border border-slate-300 shadow-xs p-4 space-y-3">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-200">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="w-7 h-7 rounded-lg bg-emerald-50 text-[#1C9A58] border border-emerald-200 flex items-center justify-center shrink-0">
               <Receipt className="w-3.5 h-3.5" />
             </span>
-            <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-black uppercase tracking-wider truncate sm:whitespace-normal">
               Recent Counter Medicine Sales
             </h3>
           </div>
           <button
             type="button"
             onClick={() => navigate('/sales')}
-            className="text-xs text-[#1C9A58] hover:underline font-bold flex items-center gap-1 cursor-pointer"
+            className="text-xs text-[#1C9A58] hover:underline font-bold flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
           >
             <span>View All Sales Invoices</span>
-            <ArrowRight className="w-3 h-3" />
+            <ArrowRight className="w-3 h-3 shrink-0" />
           </button>
         </div>
 
-        <div className="overflow-x-auto no-scrollbar">
-          <table className="w-full text-left text-xs border-collapse">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[650px] lg:min-w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-100/90 border-b border-slate-300 text-black font-bold text-[10px] uppercase tracking-wider select-none">
                 <th className="py-2.5 px-3">Invoice #</th>
@@ -897,9 +913,9 @@ export const MedicineCounter = () => {
               toast.showError(err.message);
             }
           }}
-          onAdjustStock={({ batchId, delta, actionType, reason }) => {
+          onAdjustStock={async ({ batchId, delta, actionType, reason }) => {
             try {
-              adjustBatchStock(batchId, delta, actionType, reason);
+              await adjustBatchStock(batchId, delta, actionType, reason);
               toast.showSuccess('Stock adjustment applied successfully!');
             } catch (err) {
               toast.showError(err.message);

@@ -575,6 +575,26 @@ export const SalesProvider = ({ children }) => {
     return sales.slice(0, 6);
   }, [sales]);
 
+  // Instantly record a completed sale and sync with backend
+  const recordCompletedSale = useCallback(
+    (completedSale) => {
+      if (!completedSale) return;
+      setSales((prev) => {
+        const id = completedSale._id || completedSale.id || completedSale.invoiceNumber;
+        const exists = prev.some(
+          (s) =>
+            (s._id && s._id === id) ||
+            (s.id && s.id === id) ||
+            (s.invoiceNumber && s.invoiceNumber === completedSale.invoiceNumber)
+        );
+        if (exists) return prev;
+        return [completedSale, ...prev];
+      });
+      fetchSalesData();
+    },
+    [fetchSalesData]
+  );
+
   return (
     <SalesContext.Provider
       value={{
@@ -598,6 +618,7 @@ export const SalesProvider = ({ children }) => {
         cartTotals: orderSummary,
         processSale,
         processCheckout: processSale,
+        recordCompletedSale,
         salesMetrics,
         isProcessingSale,
         isLoading,

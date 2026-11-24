@@ -180,39 +180,100 @@ button:disabled,
   scrollbar-width: none !important;
 }
 
-/* Print Styles for Professional A4 Invoices & Receipts */
+/* =========================================================================
+   AUTHENTIC PHARMACY INVOICE & THERMAL RECEIPT PRINT STYLES
+   ========================================================================= */
 @media print {
-  /* Hide sidebar, navigation header, toasts, and buttons */
+  /* Suppress browser default header (localhost URL) and footer (page 1/2) */
+  @page {
+    size: auto;
+    margin: 0mm !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* When printing an invoice modal, COMPLETELY remove the background app (#root) from print DOM flow */
+  body.invoice-modal-open #root,
+  body.printing-invoice #root {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Hide screen-only elements: navigation, sidebars, toast popups, action bars, backdrop */
   aside,
   header,
   nav,
-  .no-print,
   button,
+  .no-print,
   .toast-container {
     display: none !important;
+    visibility: hidden !important;
   }
 
-  body,
-  main,
-  #root {
-    background: #ffffff !important;
-    padding: 0 !important;
-    margin: 0 !important;
+  /* The portal containing the invoice dialog takes over full print canvas */
+  .invoice-portal-root {
+    position: static !important;
+    display: block !important;
     width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
   }
 
-  .printable-invoice-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+  .invoice-modal-dialog {
+    position: static !important;
+    transform: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 0 !important;
-    padding: 24px !important;
-    background: #ffffff !important;
     box-shadow: none !important;
     border: none !important;
-    z-index: 999999;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+
+  /* A4 / Standard Pharmacy Voucher Format */
+  .printable-invoice-container.format-a4 {
+    width: 100% !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 8mm 12mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* 80mm POS Thermal Slip Format */
+  .printable-invoice-container.format-thermal {
+    width: 76mm !important;
+    max-width: 76mm !important;
+    margin: 0 auto !important;
+    padding: 3mm 2mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    font-size: 11px !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    page-break-inside: avoid !important;
   }
 }

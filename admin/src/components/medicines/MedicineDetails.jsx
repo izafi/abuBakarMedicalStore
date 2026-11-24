@@ -16,6 +16,7 @@ import {
   FileText,
   DollarSign,
   FlaskConical,
+  Copy,
 } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { BatchForm } from '../batches/BatchForm';
@@ -54,8 +55,9 @@ export const MedicineDetails = ({
   const isLowStock = availableStock > 0 && availableStock <= (medicine.minStockAlert || 15);
 
   const handleCopy = (text, label) => {
+    if (!text) return;
     if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(text);
+      navigator.clipboard.writeText(String(text));
       toast.showInfo(`Copied ${label}: "${text}"`);
     }
   };
@@ -87,64 +89,74 @@ export const MedicineDetails = ({
         isOpen={isOpen}
         onClose={onClose}
         title={
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 via-[#1C9A58] to-teal-400 text-white shadow-xs flex items-center justify-center shrink-0">
-              <Pill className="w-5 h-5 drop-shadow-xs" />
+          <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-[#1C9A58] flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+              <Pill className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-base sm:text-lg font-bold text-black tracking-tight leading-tight">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <span className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-snug">
                   {cleanName}
                 </span>
-                <span
-                  className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs cursor-pointer hover:bg-emerald-200 transition-colors"
-                  title="Medicine Dosage Form"
-                >
-                  {medicine.type}
-                </span>
-                <span
-                  className="px-2 py-0.5 rounded-md text-xs font-bold bg-blue-100 text-blue-900 border border-blue-300 shadow-2xs cursor-pointer hover:bg-blue-200 transition-colors"
-                  title="Dosage Strength"
-                >
-                  {medicine.strength}
-                </span>
+                {medicine.type && (
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    {medicine.type}
+                  </span>
+                )}
+                {medicine.strength && (
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                    {medicine.strength}
+                  </span>
+                )}
               </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-800 font-medium mt-1">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-slate-600 mt-1">
                 <span
                   onClick={() => handleCopy(medicine.medicineId, 'Medicine ID')}
-                  className="font-mono text-black font-bold bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded border border-slate-300 shadow-2xs cursor-pointer transition-all"
+                  className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded border border-slate-200 cursor-pointer transition-colors"
                   title="Click to copy Medicine ID"
                 >
                   {medicine.medicineId}
                 </span>
-                <span
-                  onClick={() => handleCopy(medicine.genericName, 'Generic Formula')}
-                  className="flex items-center gap-1 cursor-pointer hover:text-black transition-colors"
-                  title="Click to copy Generic Formulation"
-                >
-                  <FlaskConical className="w-3 h-3 text-emerald-600 shrink-0" />
-                  <span>Generic:</span>
-                  <strong className="text-black font-bold hover:underline">{medicine.genericName}</strong>
-                </span>
+                {medicine.genericName && (
+                  <span
+                    onClick={() => handleCopy(medicine.genericName, 'Generic Formula')}
+                    className="flex items-center gap-1 text-[11px] text-slate-600 hover:text-black cursor-pointer truncate max-w-[200px] sm:max-w-none"
+                    title="Click to copy Generic Formulation"
+                  >
+                    <FlaskConical className="w-3 h-3 text-emerald-600 shrink-0" />
+                    <span className="text-slate-400">Generic:</span>
+                    <strong className="text-slate-800 font-semibold truncate hover:underline">
+                      {medicine.genericName}
+                    </strong>
+                  </span>
+                )}
               </div>
             </div>
           </div>
         }
         size="xl"
         footer={
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-2 text-xs font-semibold text-neutral-800">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span>
-                {batches.length} stock batch{batches.length === 1 ? '' : 'es'} linked • Physical Stock:{' '}
-                <strong className="text-black font-bold">{totalStock}</strong> units
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 w-full">
+            {/* Stock Summary Pill */}
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  isOutOfStock ? 'bg-rose-500' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
+                }`}
+              />
+              <span className="truncate">
+                <strong className="text-slate-900 font-bold">{totalStock}</strong> units total in{' '}
+                <strong className="text-slate-900 font-bold">{batches.length}</strong> batch
+                {batches.length === 1 ? '' : 'es'}
               </span>
             </div>
-            <div className="flex items-center gap-2.5 ml-auto">
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={onClose}
-                className="text-xs font-bold px-4 py-2 rounded-lg border border-slate-300 text-black hover:bg-slate-100 cursor-pointer transition-all"
+                className="flex-1 sm:flex-none text-xs font-bold px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:text-black hover:bg-slate-100 cursor-pointer transition-all text-center"
               >
                 Close
               </button>
@@ -155,7 +167,7 @@ export const MedicineDetails = ({
                     onClose();
                     onEdit(medicine);
                   }}
-                  className="bg-gradient-to-r from-emerald-600 via-[#1C9A58] to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs px-5 py-2 rounded-lg shadow-xs hover:shadow-sm cursor-pointer transition-all flex items-center gap-1.5"
+                  className="flex-1 sm:flex-none bg-[#1C9A58] hover:bg-[#158046] text-white font-bold text-xs px-4 py-2 rounded-lg shadow-2xs hover:shadow-xs cursor-pointer transition-all flex items-center justify-center gap-1.5"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
                   <span>Edit Medicine</span>
@@ -165,175 +177,111 @@ export const MedicineDetails = ({
           </div>
         }
       >
-        <div className="space-y-3.5">
+        <div className="space-y-3 sm:space-y-3.5">
           {/* ========================================================
-              4 COLORFUL, VIBRANT, EYE-CATCHING STAT CARDS
+              1. CLEAN, HIGH-CONTRAST KEY METRICS (2x2 on mobile, 4 on desktop)
               ======================================================== */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {/* 1. SELLING PRICE (Emerald Theme) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+            {/* SELLING PRICE */}
             <div
               onClick={() => handleCopy(medicine.sellingPrice, 'Selling Price')}
-              className="p-3 rounded-xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/30 shadow-2xs space-y-1 hover:border-emerald-400 hover:shadow-xs transition-all cursor-pointer"
+              className="p-2.5 sm:p-3 rounded-xl border border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/70 transition-colors cursor-pointer"
               title="Click to copy selling price"
             >
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-900 uppercase tracking-wider">
-                <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Selling Price</span>
+              <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-800 uppercase tracking-wider">
+                <DollarSign className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Price</span>
               </div>
-              <p className="text-lg sm:text-xl font-extrabold text-[#1C9A58] tabular-nums tracking-tight">
+              <p className="text-base sm:text-lg font-extrabold text-[#1C9A58] mt-1 tabular-nums">
                 {formatCurrency(medicine.sellingPrice)}
               </p>
-              <span className="text-[10px] text-neutral-600 font-medium block">
-                Standard retail rate
-              </span>
             </div>
 
-            {/* 2. AVAILABLE PHYSICAL STOCK (Amber/Emerald Theme) */}
+            {/* AVAILABLE STOCK */}
             <div
               onClick={() => {
                 toast.showInfo(`Total available inventory: ${availableStock} units across ${batches.length} batch(es)`);
               }}
-              className={`p-3 rounded-xl border shadow-2xs space-y-1 transition-all cursor-pointer hover:shadow-xs ${
+              className={`p-2.5 sm:p-3 rounded-xl border transition-colors cursor-pointer ${
                 isOutOfStock
-                  ? 'border-rose-200 bg-gradient-to-br from-rose-50/70 via-white to-rose-50/20 hover:border-rose-400'
+                  ? 'border-rose-200 bg-rose-50/40 hover:bg-rose-50/70'
                   : isLowStock
-                  ? 'border-amber-200 bg-gradient-to-br from-amber-50/70 via-white to-orange-50/20 hover:border-amber-400'
-                  : 'border-emerald-200 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/20 hover:border-emerald-400'
+                  ? 'border-amber-200 bg-amber-50/40 hover:bg-amber-50/70'
+                  : 'border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/70'
               }`}
-              title="Click for stock summary"
+              title="Click for stock details"
             >
-              <div className="flex items-center justify-between text-[11px] font-bold text-black uppercase tracking-wider">
-                <span className="flex items-center gap-1">
-                  <Boxes className="w-3.5 h-3.5 text-black" />
-                  <span>Stock Units</span>
+              <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider">
+                <span className="flex items-center gap-1 text-slate-700">
+                  <Boxes className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span>Stock</span>
                 </span>
                 {isOutOfStock ? (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                  <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.2 rounded-full border border-rose-300">
                     Out
                   </span>
                 ) : isLowStock ? (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded-full border border-amber-300">
                     Low
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded-full border border-emerald-300">
                     In Stock
                   </span>
                 )}
               </div>
-              <p className="text-lg sm:text-xl font-extrabold text-black tabular-nums tracking-tight">
-                {availableStock} <span className="text-xs font-semibold text-neutral-700">units</span>
+              <p className="text-base sm:text-lg font-extrabold text-slate-900 mt-1 tabular-nums">
+                {availableStock}{' '}
+                <span className="text-xs font-semibold text-slate-500">units</span>
               </p>
-              <span className="text-[10px] text-neutral-600 font-medium block">
-                Alert limit: {medicine.minStockAlert || 15} units
-              </span>
             </div>
 
-            {/* 3. THERAPEUTIC CATEGORY (Royal Blue Theme) */}
+            {/* CATEGORY */}
             <div
               onClick={() => handleCopy(medicine.category, 'Category')}
-              className="p-3 rounded-xl border border-blue-200/90 bg-gradient-to-br from-blue-50/70 via-white to-indigo-50/30 shadow-2xs space-y-1 hover:border-blue-400 hover:shadow-xs transition-all cursor-pointer"
+              className="p-2.5 sm:p-3 rounded-xl border border-blue-200 bg-blue-50/40 hover:bg-blue-50/70 transition-colors cursor-pointer"
               title="Click to copy category"
             >
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-blue-900 uppercase tracking-wider">
-                <Tag className="w-3.5 h-3.5 text-blue-600" />
+              <div className="flex items-center gap-1 text-[11px] font-bold text-blue-800 uppercase tracking-wider">
+                <Tag className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                 <span>Category</span>
               </div>
-              <p className="text-xs sm:text-sm font-bold text-black truncate" title={medicine.category}>
+              <p className="text-xs sm:text-sm font-bold text-slate-900 mt-1 truncate" title={medicine.category}>
                 {medicine.category || 'General'}
               </p>
-              <span className="text-[10px] text-neutral-600 font-medium block">
-                Therapeutic class
-              </span>
             </div>
 
-            {/* 4. STORAGE SHELF LOCATION (Purple Theme) */}
+            {/* STORAGE LOCATION */}
             <div
-              onClick={() => handleCopy(medicine.location, 'Storage Shelf')}
-              className="p-3 rounded-xl border border-purple-200/90 bg-gradient-to-br from-purple-50/70 via-white to-fuchsia-50/30 shadow-2xs space-y-1 hover:border-purple-400 hover:shadow-xs transition-all cursor-pointer"
-              title="Click to copy shelf location"
+              onClick={() => handleCopy(medicine.location, 'Shelf Location')}
+              className="p-2.5 sm:p-3 rounded-xl border border-purple-200 bg-purple-50/40 hover:bg-purple-50/70 transition-colors cursor-pointer"
+              title="Click to copy storage shelf"
             >
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-purple-900 uppercase tracking-wider">
-                <MapPin className="w-3.5 h-3.5 text-purple-600" />
-                <span>Storage Shelf</span>
+              <div className="flex items-center gap-1 text-[11px] font-bold text-purple-800 uppercase tracking-wider">
+                <MapPin className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                <span>Shelf Rack</span>
               </div>
-              <p className="text-xs sm:text-sm font-bold text-black font-mono truncate" title={medicine.location}>
+              <p className="text-xs sm:text-sm font-bold text-slate-900 font-mono mt-1 truncate" title={medicine.location}>
                 {medicine.location || 'Shelf Rack'}
               </p>
-              <span className="text-[10px] text-neutral-600 font-medium block">
-                Store location
-              </span>
             </div>
           </div>
 
           {/* ========================================================
-              CLINICAL INDICATIONS & PHARMACEUTICAL SPECS
+              2. ACTIVE BATCHES & DISPENSING STOCK (PRIMARY PHARMACY VIEW)
               ======================================================== */}
-          <div className="p-3.5 rounded-xl border border-emerald-100 bg-gradient-to-br from-white via-slate-50/40 to-emerald-50/20 shadow-2xs space-y-2.5">
-            <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+          <div className="p-3 sm:p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-1 rounded-md shadow-2xs">
-                  <FileText className="w-3.5 h-3.5" />
-                </span>
-                <div>
-                  <h4 className="text-xs font-bold text-black uppercase tracking-wider">
-                    Clinical Indications & Specifications
-                  </h4>
-                  <p className="text-[11px] text-neutral-800 font-medium">
-                    Therapeutic medical usage notes and active chemical formulation
-                  </p>
+                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-[#1C9A58] border border-emerald-200 flex items-center justify-center shrink-0">
+                  <Layers className="w-4 h-4" />
                 </div>
-              </div>
-            </div>
-
-            <p className="text-xs text-black font-medium leading-relaxed bg-white/80 p-2.5 rounded-lg border border-slate-200/80 shadow-2xs">
-              {medicine.usage || 'Standard clinical administration as prescribed by medical practitioner.'}
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
-              <div
-                onClick={() => handleCopy(medicine.manufacturer, 'Manufacturer')}
-                className="flex items-center gap-2 p-2 bg-white hover:bg-slate-50 rounded-lg border border-slate-200/80 hover:border-blue-300 shadow-2xs cursor-pointer transition-all"
-                title="Click to copy manufacturer"
-              >
-                <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span className="text-neutral-700 font-medium">Manufacturer:</span>
-                <span className="font-bold text-black truncate">{medicine.manufacturer || 'N/A'}</span>
-              </div>
-
-              {medicine.formula && (
-                <div
-                  onClick={() => handleCopy(medicine.formula, 'Chemical Formula')}
-                  className="flex items-center gap-2 p-2 bg-white hover:bg-slate-50 rounded-lg border border-slate-200/80 hover:border-emerald-300 shadow-2xs cursor-pointer transition-all truncate"
-                  title="Click to copy chemical formula"
-                >
-                  <FlaskConical className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="text-neutral-700 font-medium shrink-0">Formula:</span>
-                  <span
-                    className="font-mono font-bold text-[11px] text-black bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 truncate hover:bg-emerald-50"
-                  >
-                    {medicine.formula}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ========================================================
-              ACTIVE INVENTORY BATCHES (VIBRANT & COMPACT)
-              ======================================================== */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between pb-0.5">
-              <div className="flex items-center gap-2">
-                <span className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1 rounded-md shadow-2xs">
-                  <Layers className="w-3.5 h-3.5" />
-                </span>
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-black">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
                     Active Batches ({batches.length})
                   </h4>
-                  <p className="text-[11px] text-neutral-800 font-medium">
-                    Batches currently in stock with expiry dates
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Batches in inventory with expiry dates & rates
                   </p>
                 </div>
               </div>
@@ -342,7 +290,7 @@ export const MedicineDetails = ({
                 <button
                   type="button"
                   onClick={() => setIsAddingBatch(true)}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1C9A58] hover:text-white bg-emerald-50 hover:bg-[#1C9A58] border border-emerald-300 px-3 py-1.5 rounded-lg shadow-2xs transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-[#1C9A58] hover:text-white bg-emerald-50 hover:bg-[#1C9A58] border border-emerald-300 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span>Add Batch</span>
@@ -351,21 +299,21 @@ export const MedicineDetails = ({
             </div>
 
             {batches.length === 0 ? (
-              <div className="p-6 rounded-xl border border-dashed border-slate-300 text-center text-slate-500 bg-slate-50/60">
-                <p className="text-xs font-bold text-black">No stock batches registered yet for this medicine.</p>
-                <p className="text-[11px] text-neutral-600 mt-0.5">Register an incoming batch to activate dispensing.</p>
+              <div className="p-5 rounded-lg border border-dashed border-slate-200 text-center text-slate-500 bg-slate-50/50">
+                <p className="text-xs font-bold text-slate-800">No stock batches registered yet for this medicine.</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Register a batch to start dispensing at the counter.</p>
                 {hasPermission('inventory', 'add') && (
                   <button
                     type="button"
                     onClick={() => setIsAddingBatch(true)}
-                    className="mt-2.5 text-xs text-white bg-[#1C9A58] hover:bg-[#158046] font-bold px-3 py-1.5 rounded-lg shadow-xs cursor-pointer inline-flex items-center gap-1.5 transition-all"
+                    className="mt-2 text-xs text-white bg-[#1C9A58] hover:bg-[#158046] font-bold px-3 py-1.5 rounded-lg shadow-2xs cursor-pointer inline-flex items-center gap-1.5 transition-colors"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Register First Batch
+                    <Plus className="w-3.5 h-3.5" /> Register Batch
                   </button>
                 )}
               </div>
             ) : (
-              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-0.5">
+              <div className="space-y-2 max-h-52 overflow-y-auto pr-0.5">
                 {batches.map((b) => {
                   const daysLeft = b.daysLeft !== undefined ? b.daysLeft : 0;
                   const isExpired = b.isExpired;
@@ -375,54 +323,54 @@ export const MedicineDetails = ({
                     <div
                       key={b.batchId || b.id || b.batchNumber}
                       onClick={() => setAdjustingBatch(b)}
-                      className="p-3 rounded-xl border border-slate-200 bg-gradient-to-r from-white via-slate-50/40 to-emerald-50/20 hover:border-emerald-400 hover:shadow-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs cursor-pointer group"
+                      className="p-2.5 sm:p-3 rounded-lg border border-slate-200 bg-slate-50/60 hover:bg-emerald-50/30 hover:border-emerald-300 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs cursor-pointer group"
                       title="Click to adjust batch stock"
                     >
-                      {/* Left: Batch ID & Expiry */}
+                      {/* Left: Batch Info & Expiry */}
                       <div className="flex flex-wrap items-center gap-2">
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
                             handleCopy(b.batchNumber, 'Batch Number');
                           }}
-                          className="font-mono text-xs font-bold text-black bg-slate-100 group-hover:bg-emerald-50 px-2 py-0.5 rounded border border-slate-300 shadow-2xs cursor-pointer transition-all"
+                          className="font-mono text-xs font-bold text-slate-900 bg-white group-hover:border-emerald-300 px-2 py-0.5 rounded border border-slate-300 shadow-2xs transition-colors"
                           title="Click to copy batch number"
                         >
                           {b.batchNumber}
                         </span>
+
                         {isExpired ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 cursor-pointer">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
                             Expired
                           </span>
                         ) : isNearExp ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 cursor-pointer">
-                            Expires Soon ({daysLeft}d)
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                            Expires in {daysLeft}d
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 cursor-pointer">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
                             Valid ({daysLeft}d)
                           </span>
                         )}
-                        <span className="text-[11px] text-neutral-800 font-medium">
-                          Exp: <strong className="text-black font-bold">{formatDate(b.expiryDate)}</strong>
+
+                        <span className="text-[11px] text-slate-600 font-medium">
+                          Exp: <strong className="text-slate-900 font-semibold">{formatDate(b.expiryDate)}</strong>
                         </span>
                       </div>
 
                       {/* Right: Quantity, Price & Actions */}
-                      <div className="flex items-center gap-3 self-end sm:self-center">
-                        <div className="text-right">
-                          <span className="text-[10px] uppercase font-bold text-neutral-500 mr-1">Qty:</span>
-                          <strong className="text-black font-extrabold text-sm">{b.quantity}</strong>
-                          <span className="text-[11px] text-neutral-600 ml-0.5 font-medium">units</span>
+                      <div className="flex items-center justify-between sm:justify-end gap-3 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-200">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] uppercase font-bold text-slate-500">Qty:</span>
+                          <span className="text-slate-900 font-extrabold text-sm">{b.quantity}</span>
+                          <span className="text-[11px] text-slate-500">units</span>
                         </div>
 
-                        <div className="text-right">
-                          <strong className="text-[#1C9A58] font-black text-sm tabular-nums">
-                            {formatCurrency(b.sellingPrice)}
-                          </strong>
+                        <div className="text-[#1C9A58] font-bold text-sm tabular-nums">
+                          {formatCurrency(b.sellingPrice)}
                         </div>
 
-                        <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                        <div className="flex items-center gap-1 pl-1">
                           {hasPermission('inventory', 'edit') && (
                             <button
                               type="button"
@@ -430,10 +378,10 @@ export const MedicineDetails = ({
                                 e.stopPropagation();
                                 setAdjustingBatch(b);
                               }}
-                              className="text-xs font-bold text-black hover:text-[#1C9A58] bg-white hover:bg-emerald-50 border border-slate-300 hover:border-emerald-300 px-2.5 py-1 rounded-lg transition-all cursor-pointer shadow-2xs"
+                              className="text-[11px] font-bold text-slate-700 hover:text-[#1C9A58] bg-white hover:bg-emerald-50 border border-slate-300 hover:border-emerald-300 px-2 py-1 rounded transition-colors"
                               title="Adjust Stock Quantity"
                             >
-                              Adjust Stock
+                              Adjust
                             </button>
                           )}
                           {hasPermission('inventory', 'edit') && (
@@ -443,7 +391,7 @@ export const MedicineDetails = ({
                                 e.stopPropagation();
                                 setEditingBatch(b);
                               }}
-                              className="p-1 text-neutral-500 hover:text-black hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                              className="p-1 text-slate-400 hover:text-black hover:bg-slate-200 rounded transition-colors"
                               title="Edit Batch"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
@@ -456,6 +404,50 @@ export const MedicineDetails = ({
                 })}
               </div>
             )}
+          </div>
+
+          {/* ========================================================
+              3. CLINICAL NOTES & SPECIFICATIONS (COMPACT & CLEAN)
+              ======================================================== */}
+          <div className="p-3 sm:p-3.5 rounded-xl border border-slate-200 bg-white shadow-2xs space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                <FileText className="w-3.5 h-3.5" />
+              </div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                Clinical Details & Specifications
+              </h4>
+            </div>
+
+            <div className="text-xs text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-200 leading-relaxed">
+              {medicine.usage || 'Standard clinical administration as prescribed by medical practitioner.'}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-0.5">
+              <div
+                onClick={() => handleCopy(medicine.manufacturer, 'Manufacturer')}
+                className="flex items-center gap-2 p-2 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 cursor-pointer transition-colors"
+                title="Click to copy manufacturer"
+              >
+                <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="text-slate-500 font-medium">Manufacturer:</span>
+                <span className="font-bold text-slate-900 truncate">{medicine.manufacturer || 'N/A'}</span>
+              </div>
+
+              {medicine.formula && (
+                <div
+                  onClick={() => handleCopy(medicine.formula, 'Chemical Formula')}
+                  className="flex items-center gap-2 p-2 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 cursor-pointer transition-colors truncate"
+                  title="Click to copy chemical formula"
+                >
+                  <FlaskConical className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="text-slate-500 font-medium shrink-0">Formula:</span>
+                  <span className="font-mono font-bold text-[11px] text-slate-900 truncate">
+                    {medicine.formula}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </Modal>

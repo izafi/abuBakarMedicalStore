@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { SearchBar } from '../components/common/SearchBar';
+import { FilterDropdown } from '../components/common/FilterDropdown';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { BatchTable } from '../components/batches/BatchTable';
 import { BatchForm } from '../components/batches/BatchForm';
@@ -85,6 +86,29 @@ export const Inventory = () => {
   const [adjustingBatch, setAdjustingBatch] = useState(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const stockStatusOptions = useMemo(
+    () => [
+      { value: 'ALL', label: `All Stock Statuses (${batches.length})` },
+      { value: BATCH_STOCK_STATUS.IN_STOCK, label: 'In Stock' },
+      { value: BATCH_STOCK_STATUS.LOW_STOCK, label: 'Low Stock' },
+      { value: BATCH_STOCK_STATUS.OUT_OF_STOCK, label: 'Out of Stock' },
+      { value: BATCH_STOCK_STATUS.NEAR_EXPIRY, label: 'Near Expiry' },
+      { value: BATCH_STOCK_STATUS.EXPIRED, label: 'Expired' },
+    ],
+    [batches.length]
+  );
+
+  const expiryFilterOptions = useMemo(
+    () => [
+      { value: 'ALL', label: 'All Expiry Windows' },
+      { value: 'NEXT_30_DAYS', label: 'Expires in next 30 days' },
+      { value: 'NEXT_90_DAYS', label: 'Expires in next 90 days' },
+      { value: 'HEALTHY', label: 'Valid (over 90 days)' },
+      { value: 'EXPIRED', label: 'Already Expired' },
+    ],
+    []
+  );
 
   // Filtered Batches List
   const filteredBatches = useMemo(() => {
@@ -254,7 +278,7 @@ export const Inventory = () => {
   ];
 
   return (
-    <div className="space-y-4 font-sans select-none">
+    <div className="space-y-4 font-sans">
       {/* Page Title & Main Action Buttons */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-1">
         <div>
@@ -267,12 +291,12 @@ export const Inventory = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             iconLeft={History}
             onClick={() => setIsHistoryOpen(true)}
-            className="text-xs font-bold px-3 py-2 rounded-lg border border-slate-300 text-black hover:bg-slate-100 cursor-pointer shadow-2xs transition-all flex items-center gap-1.5"
+            className="text-xs font-bold px-3 py-2 rounded-lg border border-slate-300 text-black hover:bg-slate-100 cursor-pointer shadow-2xs transition-all flex items-center justify-center gap-1.5 w-full sm:w-auto"
           >
             Stock Movement History ({stockHistory.length})
           </Button>
@@ -285,7 +309,7 @@ export const Inventory = () => {
                 setEditingBatch(null);
                 setIsBatchFormOpen(true);
               }}
-              className="bg-[#1C9A58] hover:bg-[#158046] text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              className="bg-[#1C9A58] hover:bg-[#158046] text-white font-bold text-xs px-3.5 py-2 rounded-lg shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer w-full sm:w-auto"
             >
               Add New Batch
             </Button>
@@ -383,8 +407,8 @@ export const Inventory = () => {
 
       {/* SEARCH AND FILTERS (Clean Solid Black Font & Borders) */}
       <div className="bg-white rounded-xl border border-slate-300 shadow-xs p-2.5 sm:p-3">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
-          <div className="md:col-span-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-2.5 items-center">
+          <div className="sm:col-span-2 md:col-span-5">
             <SearchBar
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -393,36 +417,28 @@ export const Inventory = () => {
             />
           </div>
 
-          <div className="md:col-span-3">
-            <select
+          <div className="sm:col-span-1 md:col-span-3">
+            <FilterDropdown
               value={stockStatusFilter}
-              onChange={(e) => setStockStatusFilter(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-black font-bold focus:outline-none focus:border-black cursor-pointer transition-colors"
-            >
-              <option value="ALL">All Stock Statuses ({batches.length})</option>
-              <option value={BATCH_STOCK_STATUS.IN_STOCK}>In Stock</option>
-              <option value={BATCH_STOCK_STATUS.LOW_STOCK}>Low Stock</option>
-              <option value={BATCH_STOCK_STATUS.OUT_OF_STOCK}>Out of Stock</option>
-              <option value={BATCH_STOCK_STATUS.NEAR_EXPIRY}>Near Expiry</option>
-              <option value={BATCH_STOCK_STATUS.EXPIRED}>Expired</option>
-            </select>
+              onChange={(val) => setStockStatusFilter(val)}
+              options={stockStatusOptions}
+              placeholder="All Stock Statuses"
+              className="w-full"
+            />
           </div>
 
-          <div className="md:col-span-3">
-            <select
+          <div className="sm:col-span-1 md:col-span-3">
+            <FilterDropdown
               value={expiryFilter}
-              onChange={(e) => setExpiryFilter(e.target.value)}
-              className="w-full h-9 px-3 text-xs bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-lg text-black font-bold focus:outline-none focus:border-black cursor-pointer transition-colors"
-            >
-              <option value="ALL">All Expiry Windows</option>
-              <option value="NEXT_30_DAYS">Expires in next 30 days</option>
-              <option value="NEXT_90_DAYS">Expires in next 90 days</option>
-              <option value="HEALTHY">Valid (over 90 days)</option>
-              <option value="EXPIRED">Already Expired</option>
-            </select>
+              onChange={(val) => setExpiryFilter(val)}
+              options={expiryFilterOptions}
+              placeholder="All Expiry Windows"
+              align="right"
+              className="w-full"
+            />
           </div>
 
-          <div className="md:col-span-1 flex justify-end">
+          <div className="sm:col-span-2 md:col-span-1 flex justify-end">
             {(searchQuery || stockStatusFilter !== 'ALL' || expiryFilter !== 'ALL') && (
               <Button
                 variant="ghost"

@@ -79,15 +79,15 @@ export const Header = ({
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 px-4 sm:px-6 py-3">
-        <div className="flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-xs border-b border-gray-100 px-3 sm:px-6 py-2.5 sm:py-3">
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
           {/* Left: Mobile hamburger, desktop collapse toggle & current view title */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             {/* Mobile hamburger button */}
             <button
               type="button"
               onClick={onOpenMobileMenu}
-              className="lg:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+              className="lg:hidden p-1.5 sm:p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
               aria-label="Open mobile navigation"
             >
               <Menu className="w-5 h-5" />
@@ -97,7 +97,7 @@ export const Header = ({
             <button
               type="button"
               onClick={onToggleSidebarCollapse}
-              className="hidden lg:flex p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer"
+              className="hidden lg:flex p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors cursor-pointer shrink-0"
               title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               aria-label="Toggle sidebar width"
             >
@@ -109,32 +109,44 @@ export const Header = ({
             </button>
 
             {/* Current View Breadcrumb / Title */}
-            <div className="min-w-0">
-              <h2 className="text-base font-extrabold text-gray-900 tracking-tight leading-snug truncate">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm sm:text-base font-extrabold text-gray-900 tracking-tight leading-snug truncate">
                 {getPageTitle()}
               </h2>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#1C9A58] animate-pulse" />
-                <span className="text-[11px] text-gray-500 font-medium">
-                  {settings?.tagline || 'Pharmacy System'} • Live API Connected
+              <div className="flex items-center gap-1.5 overflow-hidden">
+                <span className="w-2 h-2 rounded-full bg-[#1C9A58] shrink-0" />
+                <span className="text-[10px] sm:text-[11px] text-gray-500 font-medium truncate">
+                  {settings?.tagline || 'Pharmacy Inventory System'}
                 </span>
               </div>
             </div>
           </div>
 
           {/* Right: Quick actions, notifications & Employee profile switcher */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Quick POS action */}
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            {/* Quick POS action: icon-only on mobile, full button on sm+ */}
             {location.pathname !== '/pos' && (
-              <Button
-                variant="primary"
-                size="sm"
-                iconLeft={ShoppingCart}
-                onClick={() => navigate('/pos')}
-                className="hidden sm:inline-flex text-xs font-bold"
-              >
-                POS Bill
-              </Button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate('/pos')}
+                  className="sm:hidden p-2 rounded-xl bg-[#1C9A58] hover:bg-[#158046] text-white shadow-xs transition-colors cursor-pointer"
+                  title="Open Billing & POS Counter"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                </button>
+                <div className="hidden sm:block">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    iconLeft={ShoppingCart}
+                    onClick={() => navigate('/pos')}
+                    className="text-xs font-bold"
+                  >
+                    POS Bill
+                  </Button>
+                </div>
+              </>
             )}
 
             {/* Notification Bell Dropdown */}
