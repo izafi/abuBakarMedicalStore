@@ -16,6 +16,7 @@ import {
   DollarSign,
   PackageCheck,
   Stethoscope,
+  Truck,
 } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { ResponsiveDatePicker } from '../common/ResponsiveDatePicker';
@@ -199,7 +200,7 @@ export const MedicineForm = ({
         medicineId: formData.medicineId.trim().toUpperCase(),
         name: formData.name.trim(),
         genericName: formData.genericName.trim(),
-        brand: formData.brand.trim() || formData.name.trim(),
+        brand: formData.brand.trim(),
         formula: formData.formula.trim(),
         strength: formData.strength.trim(),
         type: formData.type,
@@ -252,7 +253,7 @@ export const MedicineForm = ({
             </div>
             <p className="text-xs text-neutral-700 font-medium mt-0.5 truncate max-w-[240px] sm:max-w-none">
               {isEditing
-                ? 'Update pharmaceutical specifications, brand, formula, and clinical notes.'
+                ? 'Update pharmaceutical specifications, distributor, formula, and clinical notes.'
                 : 'Create a master pharmaceutical catalog record with active formulation.'}
             </p>
           </div>
@@ -287,19 +288,19 @@ export const MedicineForm = ({
     >
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* ========================================================
-            CARD 1: MEDICINE IDENTITY & BRAND (EMERALD THEME)
+            CARD 1: MEDICINE IDENTITY & DISTRIBUTOR (EMERALD THEME)
             ======================================================== */}
         <div className="p-3 sm:p-3.5 rounded-xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/40 via-white to-teal-50/20 shadow-2xs space-y-2.5">
-          <div className="flex items-center justify-between pb-1.5 border-b border-emerald-100">
-            <div className="flex items-center gap-2">
-              <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-1 rounded-md shadow-2xs">
+          <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-emerald-100">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-1 rounded-md shadow-2xs shrink-0">
                 <Tag className="w-3.5 h-3.5" />
               </span>
-              <h3 className="text-xs font-bold text-black uppercase tracking-wider">
-                Medicine Identity & Brand
+              <h3 className="text-xs font-bold text-black uppercase tracking-normal sm:tracking-wider">
+                Medicine Identity & Distributor
               </h3>
             </div>
-            <span className="text-[11px] font-mono font-bold text-black bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
+            <span className="text-[10px] sm:text-[11px] font-mono font-bold text-black bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 whitespace-nowrap shrink-0">
               {formData.medicineId}
             </span>
           </div>
@@ -354,19 +355,19 @@ export const MedicineForm = ({
               )}
             </div>
 
-            {/* Commercial Brand */}
+            {/* Distributor Name (Optional) */}
             <div className="order-3 sm:order-3 col-span-1">
               <label className="flex items-center gap-1 text-xs font-bold text-black mb-1">
-                <Building2 className="w-3 h-3 text-emerald-600" />
-                <span>Commercial Brand</span>
-                <span className="text-rose-600">*</span>
+                <Truck className="w-3 h-3 text-emerald-600" />
+                <span>Distributor Name</span>
+                <span className="text-[10px] text-slate-500 font-normal">(Optional)</span>
               </label>
               <input
                 type="text"
                 name="brand"
                 value={formData.brand}
                 onChange={handleChange}
-                placeholder="e.g. Panadol"
+                placeholder="e.g. Ali Brothers, Muller & Phipps"
                 className={`w-full h-8 px-2.5 text-xs font-bold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
                   errors.brand
                     ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20'
@@ -412,16 +413,16 @@ export const MedicineForm = ({
             CARD 2: FORMULATION & SPECS (BLUE THEME)
             ======================================================== */}
         <div className="p-3 sm:p-3.5 rounded-xl border border-blue-200/90 bg-gradient-to-br from-blue-50/40 via-white to-indigo-50/20 shadow-2xs space-y-2.5">
-          <div className="flex items-center justify-between pb-1.5 border-b border-blue-100">
-            <div className="flex items-center gap-2">
-              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1 rounded-md shadow-2xs">
+          <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-blue-100">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-1 rounded-md shadow-2xs shrink-0">
                 <Layers className="w-3.5 h-3.5" />
               </span>
-              <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+              <h3 className="text-xs font-bold text-black uppercase tracking-normal sm:tracking-wider">
                 Formulation, Type & Classification
               </h3>
             </div>
-            <span className="text-[11px] font-bold text-black bg-blue-100 px-2 py-0.5 rounded border border-blue-200">
+            <span className="text-[10px] sm:text-[11px] font-bold text-black bg-blue-100 px-2 py-0.5 rounded border border-blue-200 whitespace-nowrap shrink-0">
               {formData.type}
             </span>
           </div>
@@ -536,7 +537,7 @@ export const MedicineForm = ({
               <label className="flex items-center gap-1 text-xs font-bold text-black mb-1">
                 <Stethoscope className="w-3 h-3 text-purple-600" />
                 <span>Chemical Formula / Composition</span>
-                <span className="text-rose-600">*</span>
+                <span className="text-[10px] text-slate-500 font-normal">(Optional)</span>
               </label>
               <input
                 type="text"
@@ -602,19 +603,19 @@ export const MedicineForm = ({
             ======================================================== */}
         {!isEditing && (
           <div className="p-3 sm:p-3.5 rounded-xl border border-amber-200/90 bg-gradient-to-br from-amber-50/50 via-white to-orange-50/20 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between pb-1.5 border-b border-amber-200/80">
-              <div className="flex items-center gap-2">
-                <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-1 rounded-md shadow-2xs">
+            <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-amber-200/80">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-1 rounded-md shadow-2xs shrink-0">
                   <Boxes className="w-3.5 h-3.5" />
                 </span>
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-black">
+                  <h4 className="text-xs font-bold uppercase tracking-normal sm:tracking-wider text-black">
                     Register Initial Stock Batch
                   </h4>
                 </div>
               </div>
 
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border bg-emerald-100 text-emerald-900 border-emerald-300">
+              <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full border bg-emerald-100 text-emerald-900 border-emerald-300 whitespace-nowrap shrink-0">
                 Mandatory First Batch
               </span>
             </div>

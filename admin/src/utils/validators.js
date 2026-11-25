@@ -30,15 +30,11 @@ export const validateMedicine = (data, existingMedicines = [], editingMedicineId
     errors.genericName = 'Generic formulation name is required';
   }
 
-  // Brand Name
-  if (!data.brand || !data.brand.trim()) {
-    errors.brand = 'Brand / Trademark is required';
-  }
+  // Distributor Name (Optional)
+  // Left optional per pharmacy requirement
 
-  // Formula details
-  if (!data.formula || !data.formula.trim()) {
-    errors.formula = 'Active chemical composition formula is required';
-  }
+  // Formula details (Optional)
+  // Left optional per pharmacy requirement
 
   // Strength
   if (!data.strength || !data.strength.trim()) {
@@ -201,4 +197,11 @@ export const validatePatientInfo = (info = {}) => {
     isValid: true,
     errors: {},
   };
+};
+
+export default {
+  validateMedicine,
+  validateEmployee,
+  validateBatch,
+  validatePatientInfo,
 };

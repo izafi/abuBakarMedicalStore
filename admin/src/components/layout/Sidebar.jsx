@@ -52,7 +52,7 @@ export const Sidebar = ({
       icon: LayoutDashboard,
     },
     {
-      to: '/',
+      to: currentUser?.role === USER_ROLES.ADMIN ? '/' : '/counter',
       label: 'Medicine Counter',
       shortLabel: 'Counter',
       icon: Store,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Plus,
   Minus,
@@ -9,9 +9,12 @@ import {
   FileText,
   PackageCheck,
   ArrowRight,
+  Receipt,
+  Search,
 } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { STOCK_ACTION_TYPES } from '../../utils/constants';
+import { useSales } from '../../hooks/useSales';
 
 export const StockAdjustModal = ({
   isOpen,
@@ -19,12 +22,96 @@ export const StockAdjustModal = ({
   batch,
   onApplyAdjustment,
 }) => {
+  const { sales, processCustomerReturn } = useSales();
   const [operation, setOperation] = useState('ADD'); // 'ADD' | 'REMOVE' | 'SET'
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('New shipment delivery intake');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!batch) return null;
+
+  const isCustomerReturn = reason.trim().toLowerCase().includes('customer return');
+
+  // Helpers for strict medicine matching (guaranteeing no [object Object] false positives)
+  const cleanMedicineText = (str) => {
+    if (!str || typeof str !== 'string') return '';
+    return str.toLowerCase().replace(/\[object object\]/gi, '').replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const extractCleanId = (val) => {
+    if (!val) return '';
+    if (typeof val === 'object' && val !== null) {
+      return (val._id || val.id || val.medicineId || '').toString().trim().toLowerCase();
+    }
+    const s = String(val).trim().toLowerCase();
+    if (s === '[object object]') return '';
+    return s;
+  };
+
+  const checkIsSameMedicine = (b, it) => {
+    if (!b || !it) return false;
+
+    // 1. Check Batch Number if present on both
+    const bBatch = (b.batchNumber || b.batchNo || '').trim().toLowerCase();
+    const itBatch = (it.batchNumber || it.batchNo || it.batchId || '').trim().toLowerCase();
+    if (bBatch && itBatch && bBatch === itBatch) {
+      return true;
+    }
+
+    // 2. Check Medicine ID if present on both (excluding [object Object])
+    const bId = extractCleanId(b.medicineId || b.medicineCode);
+    const itId = extractCleanId(it.medicineId || it.medicineCode);
+    if (bId && itId && bId === itId) {
+      return true;
+    }
+
+    // 3. Check Medicine Name (Strict primary token match, not loose substring)
+    const bName = cleanMedicineText(
+      b.medicineName || (typeof b.medicineId === 'object' && b.medicineId !== null ? b.medicineId.name : '')
+    );
+    const itName = cleanMedicineText(it.medicineName || it.name);
+
+    if (!bName || !itName) return false;
+    if (bName === itName) return true;
+
+    const bTokens = bName.split(' ').filter((w) => w.length >= 3);
+    const itTokens = itName.split(' ').filter((w) => w.length >= 3);
+
+    if (bTokens.length > 0 && itTokens.length > 0) {
+      // Must match primary brand token
+      if (bTokens[0] === itTokens[0]) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  // Find matching sale from invoice number
+  const matchedSale = useMemo(() => {
+    if (!invoiceNumber.trim() || !sales) return null;
+    const inv = invoiceNumber.trim().toLowerCase();
+    return sales.find((s) => {
+      const sInv = (s.invoiceNumber || '').toLowerCase().trim();
+      return sInv === inv || sInv.replace(/[-_ ]/g, '') === inv.replace(/[-_ ]/g, '');
+    });
+  }, [invoiceNumber, sales]);
+
+  // Find matching medicine line item in the matched invoice
+  const matchedItem = useMemo(() => {
+    if (!matchedSale || !batch) return null;
+    return (matchedSale.items || []).find((it) => checkIsSameMedicine(batch, it));
+  }, [matchedSale, batch]);
+
+  // Suggest recent invoices that genuinely sold this medicine to assist user
+  const recentInvoicesWithMedicine = useMemo(() => {
+    if (!batch || !sales) return [];
+    return sales
+      .filter((s) => (s.items || []).some((it) => checkIsSameMedicine(batch, it)))
+      .slice(0, 3);
+  }, [batch, sales]);
 
   const currentQty = Number(batch.quantity) || 0;
   const numAmount = parseInt(amount, 10) || 0;
@@ -47,9 +134,9 @@ export const StockAdjustModal = ({
     actionType = STOCK_ACTION_TYPES.UPDATE_STOCK;
   }
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    if (isNaN(numAmount) || numAmount < 0) {
+    if (isNaN(numAmount) || numAmount <= 0) {
       setError('Please specify a valid positive number');
       return;
     }
@@ -66,6 +153,63 @@ export const StockAdjustModal = ({
 
     if (!reason.trim()) {
       setError('Audit reason is required for stock tracking.');
+      return;
+    }
+
+    // Customer Return Validation
+    if (isCustomerReturn) {
+      if (!invoiceNumber.trim()) {
+        setError('Please enter the original sales invoice number for this customer return.');
+        return;
+      }
+      if (!matchedSale) {
+        setError(`Invoice #${invoiceNumber.trim()} was not found in sales history.`);
+        return;
+      }
+      if (!matchedItem) {
+        setError(
+          `Incorrect Invoice! Invoice #${matchedSale.invoiceNumber} is for "${(matchedSale.items || []).map((i) => i.medicineName).join(', ')}" and does NOT contain "${batch.medicineName || 'this medicine'}". Please select the correct invoice.`
+        );
+        return;
+      }
+      if (numAmount > matchedItem.quantity) {
+        setError(
+          `Cannot return ${numAmount} units. Only ${matchedItem.quantity} units were sold on Invoice #${matchedSale.invoiceNumber}.`
+        );
+        return;
+      }
+
+      setIsSubmitting(true);
+      try {
+        if (processCustomerReturn) {
+          await processCustomerReturn({
+            invoiceNumber: matchedSale.invoiceNumber,
+            batchId: batch.batchId || batch.id,
+            batchNumber: batch.batchNumber || batch.batchNo || matchedItem.batchNumber,
+            medicineId: batch.medicineId || batch.medicineCode || matchedItem.medicineId,
+            medicineName: batch.medicineName || matchedItem.medicineName,
+            quantity: numAmount,
+            reason: reason.trim(),
+          });
+        }
+
+        if (onApplyAdjustment) {
+          onApplyAdjustment({
+            batchId: batch.batchId || batch.id,
+            delta: numAmount,
+            actionType: STOCK_ACTION_TYPES.ADD_STOCK,
+            reason: `${reason.trim()} (Invoice: #${matchedSale.invoiceNumber})`,
+            invoiceNumber: matchedSale.invoiceNumber,
+            isCustomerReturn: true,
+          });
+        }
+
+        onClose();
+      } catch (err) {
+        setError(err.message || 'Failed to process customer return.');
+      } finally {
+        setIsSubmitting(false);
+      }
       return;
     }
 
@@ -131,11 +275,25 @@ export const StockAdjustModal = ({
             <button
               type="button"
               onClick={handleSave}
-              disabled={(numAmount <= 0 && operation !== 'SET') || newCalculatedQty < 0}
+              disabled={
+                (numAmount <= 0 && operation !== 'SET') ||
+                newCalculatedQty < 0 ||
+                isSubmitting ||
+                (isCustomerReturn && (!matchedSale || !matchedItem))
+              }
               className="flex-1 sm:flex-none bg-[#1C9A58] hover:bg-[#158046] text-white font-bold text-xs px-4 sm:px-5 py-1.5 sm:py-2 rounded-lg shadow-2xs hover:shadow-xs cursor-pointer transition-all flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Check className="w-4 h-4 stroke-[2.5]" />
-              <span>Apply Stock Update</span>
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Processing Return...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 stroke-[2.5]" />
+                  <span>Apply Stock Update</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -393,6 +551,9 @@ export const StockAdjustModal = ({
                     type="button"
                     onClick={() => {
                       setReason(sug);
+                      if (sug === 'Customer return to stock') {
+                        setOperation('ADD');
+                      }
                       setError('');
                     }}
                     className={`px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
@@ -408,6 +569,135 @@ export const StockAdjustModal = ({
             </div>
           </div>
         </div>
+
+        {/* ========================================================
+            CARD 4: CUSTOMER RETURN INVOICE VERIFICATION (EMERALD THEME)
+            ======================================================== */}
+        {isCustomerReturn && (
+          <div className="p-2.5 sm:p-4 rounded-xl border border-emerald-300 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/30 shadow-2xs space-y-2.5 transition-all">
+            <div className="flex items-center justify-between pb-1.5 border-b border-emerald-200">
+              <div className="flex items-center gap-2">
+                <span className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-1 rounded-md shadow-2xs">
+                  <Receipt className="w-3.5 h-3.5" />
+                </span>
+                <div>
+                  <h3 className="text-xs font-bold text-black uppercase tracking-wider">
+                    Customer Sales Invoice Reference
+                  </h3>
+                  <p className="text-[11px] text-neutral-800 font-medium hidden sm:block">
+                    Specify the sales invoice to verify and deduct the returned medicine
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full border bg-emerald-100 text-emerald-900 border-emerald-300 whitespace-nowrap shrink-0">
+                Audit Return
+              </span>
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1 text-xs font-bold text-black mb-1">
+                <span>Invoice Number</span>
+                <span className="text-rose-600">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={invoiceNumber}
+                onChange={(e) => {
+                  setInvoiceNumber(e.target.value);
+                  setError('');
+                }}
+                placeholder="e.g. INV-20261123-7881 or ABM-20261123-1234"
+                className="w-full h-8 sm:h-9 px-2.5 sm:px-3 text-xs font-mono font-bold bg-white border border-emerald-300 hover:border-emerald-500 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/30 rounded-lg text-black transition-all"
+              />
+            </div>
+
+            {/* Quick helper chips for recent matching invoices */}
+            {recentInvoicesWithMedicine.length > 0 && !invoiceNumber.trim() && (
+              <div className="pt-0.5">
+                <span className="text-[10px] text-neutral-600 font-semibold block mb-1">
+                  Recent sales containing this medicine:
+                </span>
+                <div className="flex flex-wrap gap-1 sm:gap-1.5">
+                  {recentInvoicesWithMedicine.map((s) => (
+                    <button
+                      key={s.invoiceNumber}
+                      type="button"
+                      onClick={() => {
+                        setInvoiceNumber(s.invoiceNumber);
+                        setError('');
+                      }}
+                      className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-white text-emerald-800 border border-emerald-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all cursor-pointer shadow-2xs"
+                    >
+                      #{s.invoiceNumber}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Live Verification Status Card */}
+            {invoiceNumber.trim() && (
+              <div className="pt-1">
+                {matchedSale && matchedItem ? (
+                  <div className="p-3 bg-white rounded-xl border-2 border-emerald-500 shadow-2xs text-xs space-y-1.5 transition-all">
+                    <div className="flex items-center justify-between text-emerald-950 font-bold pb-1 border-b border-emerald-100">
+                      <span className="flex items-center gap-1.5">
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0 stroke-[2.5]" />
+                        <span>Correct Invoice Verified: #{matchedSale.invoiceNumber}</span>
+                      </span>
+                      <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded border border-emerald-300">
+                        {matchedItem.quantity} units sold
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px] text-neutral-700 pt-0.5">
+                      <div>
+                        Medicine: <strong className="text-black">{matchedItem.medicineName}</strong>
+                      </div>
+                      <div className="text-right">
+                        Unit Price: <strong className="text-black">Rs. {Number(matchedItem.unitPrice || 0).toFixed(2)}</strong>
+                      </div>
+                    </div>
+                    {matchedSale.items && matchedSale.items.length > 1 ? (
+                      <div className="p-1.5 bg-blue-50/80 border border-blue-200 rounded text-[10px] text-blue-900 font-medium">
+                        ℹ️ This invoice contains {matchedSale.items.length} items. Only <strong>{matchedItem.medicineName}</strong> will be removed/deducted from the invoice; all other medicines on this invoice remain untouched.
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-emerald-800 font-semibold pt-0.5">
+                        ✓ Only {matchedItem.medicineName} will be removed from sales history & reports and restored to shelf stock.
+                      </p>
+                    )}
+                  </div>
+                ) : matchedSale && !matchedItem ? (
+                  <div className="p-3 bg-rose-50 rounded-xl border-2 border-rose-300 text-xs text-rose-950 space-y-1.5 shadow-2xs transition-all">
+                    <div className="flex items-center gap-1.5 font-bold text-rose-800">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 stroke-[2.5]" />
+                      <span>Incorrect Invoice Selected</span>
+                    </div>
+                    <p className="text-[11px] text-rose-900 leading-normal">
+                      Invoice <strong>#{matchedSale.invoiceNumber}</strong> is for{' '}
+                      <span className="font-semibold text-black">
+                        {(matchedSale.items || []).map((i) => i.medicineName).join(', ') || 'other items'}
+                      </span>
+                      , but does <strong>NOT</strong> contain{' '}
+                      <span className="font-bold underline text-black">{batch.medicineName || 'this medicine'}</span>.
+                    </p>
+                    <p className="text-[11px] font-bold text-rose-700 bg-white/80 p-1.5 rounded-lg border border-rose-200">
+                      👉 Please select or enter the correct invoice number for {batch.medicineName || 'this medicine'}.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700 flex items-center gap-2 shadow-2xs">
+                    <AlertCircle className="w-4 h-4 text-slate-500 shrink-0" />
+                    <span className="text-[11px] font-medium">
+                      Checking sales records: Invoice "{invoiceNumber.trim()}" not found.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </form>
     </Modal>
   );

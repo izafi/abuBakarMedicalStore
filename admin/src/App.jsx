@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProviders } from './context';
 import { Layout } from './components/layout/Layout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
@@ -13,6 +13,22 @@ import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { NotFound } from './pages/NotFound';
 import { PERMISSION_MODULES } from './utils/constants';
+import { useAuth } from './hooks/useAuth';
+
+// Role-based landing page component:
+// Employees land directly on Billing & POS (/pos)
+// Administrators land on Medicine Counter (/)
+function RoleBasedLanding() {
+  const { currentUser, isAdmin } = useAuth();
+
+  // If user is logged in as an Employee, make Billing & POS (/pos) the landing page
+  if (currentUser && !isAdmin) {
+    return <Navigate to="/pos" replace />;
+  }
+
+  // Admin users land on Medicine Counter
+  return <MedicineCounter />;
+}
 
 export function App() {
   return (
@@ -20,8 +36,11 @@ export function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout />}>
-            {/* Medicine Counter is the default landing page */}
-            <Route index element={<MedicineCounter />} />
+            {/* Role-based default landing page:
+                - Employees land on Billing & POS (/pos)
+                - Administrators land on Medicine Counter (/) */}
+            <Route index element={<RoleBasedLanding />} />
+            <Route path="counter" element={<MedicineCounter />} />
 
             {/* Medicines Management */}
             <Route

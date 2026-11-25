@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Lock,
   Mail,
@@ -10,13 +11,14 @@ import {
   AlertCircle,
   CheckCircle2,
 } from 'lucide-react';
-import { APP_INFO } from '../../utils/constants';
+import { APP_INFO, USER_ROLES } from '../../utils/constants';
 import { useAuth } from '../../hooks/useAuth';
 import { useSettings } from '../../hooks/useSettings';
 import { authService } from '../../services/authService';
 import { alert } from '../../utils/sweetAlert';
 
 export const LoginModal = () => {
+  const navigate = useNavigate();
   const { login, isAuthenticated } = useAuth();
   const { settings } = useSettings();
 
@@ -56,6 +58,11 @@ export const LoginModal = () => {
       setIsLoading(true);
       const user = await login(identifier.trim(), password);
       alert.toast(`Welcome back, ${user?.name || 'Administrator'}!`, 'success');
+
+      // If logging in as an employee, land directly on Billing & POS
+      if (user?.role && user.role !== USER_ROLES.ADMIN) {
+        navigate('/pos', { replace: true });
+      }
     } catch (err) {
       console.error('[Login] Authentication failed:', err);
       const msg = err.data?.message || err.message || 'Invalid credentials. Please verify your email and password.';

@@ -6,6 +6,7 @@ const {
   getTodaySales,
   getSalesSummary,
   getSaleById,
+  returnSaleItem,
 } = require('../controller/salesController');
 const {
   getSalesHistory,
@@ -48,6 +49,7 @@ router.get('/:id', checkPermission('sales', 'view'), getSaleById);
 // ==========================================
 router.post('/', checkPermission('sales', 'add'), createSale);
 router.post('/checkout', checkPermission('sales', 'add'), checkoutSale);
+router.post('/return-item', checkPermission('sales', 'add'), returnSaleItem);
 
 // ==========================================
 // 5. BLOCKED OPERATIONS (COMPLIANCE GUARDS)

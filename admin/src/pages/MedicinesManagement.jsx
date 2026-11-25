@@ -298,7 +298,7 @@ export const MedicinesManagement = () => {
             <SearchBar
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by brand name, category, generic formula, or Medicine ID..."
+              placeholder="Search by medicine name, distributor, category, formula, or Medicine ID..."
               className="text-xs"
             />
           </div>
@@ -445,10 +445,14 @@ export const MedicinesManagement = () => {
             }
           }}
           onDeleteBatch={handleDeleteBatch}
-          onAdjustStock={async ({ batchId, delta, actionType, reason }) => {
+          onAdjustStock={async ({ batchId, delta, actionType, reason, isCustomerReturn }) => {
             try {
-              await adjustBatchStock(batchId, delta, actionType, reason);
-              toast.showSuccess('Stock adjustment applied successfully!');
+              if (!isCustomerReturn) {
+                await adjustBatchStock(batchId, delta, actionType, reason);
+                toast.showSuccess('Stock adjustment applied successfully!');
+              } else {
+                toast.showSuccess('Customer return processed successfully!');
+              }
             } catch (err) {
               toast.showError(err.message);
             }

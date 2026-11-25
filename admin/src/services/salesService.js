@@ -32,6 +32,10 @@ export const salesService = {
   getInvoice: async (invoiceNumber) => {
     return apiClient.get(`/invoices/${invoiceNumber}`);
   },
+
+  returnItem: async (returnData) => {
+    return apiClient.post('/sales/return-item', returnData);
+  },
 };
 
 export default salesService;

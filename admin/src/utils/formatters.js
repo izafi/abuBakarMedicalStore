@@ -112,9 +112,6 @@ export const canSellBatch = (batch) => {
  */
 export const getCleanMedicineName = (med) => {
   if (!med) return '';
-  if (med.brand && typeof med.brand === 'string' && med.brand.trim()) {
-    return med.brand.trim();
-  }
 
   let clean = med.name || '';
   const strength = (med.strength || '').trim();

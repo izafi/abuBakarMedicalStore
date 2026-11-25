@@ -1,6 +1,9 @@
 const mongoose = require('mongoose');
 const Sale = require('../models/Sale');
 const SaleItem = require('../models/SaleItem');
+const Batch = require('../models/Batch');
+const StockHistory = require('../models/StockHistory');
+const Invoice = require('../models/Invoice');
 const Employee = require('../models/Employee');
 const { processSale } = require('../services/saleService');
 const ApiResponse = require('../utils/apiResponse');
@@ -355,6 +358,184 @@ const getSaleById = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Process customer return for an item on a given invoice
+ *          Replenishes batch stock, logs stock history audit, and removes/updates the medicine from sales history & invoice
+ * @route   POST /api/v1/sales/return-item
+ * @access  Private ('sales.add')
+ */
+const returnSaleItem = asyncHandler(async (req, res) => {
+  const { invoiceNumber, batchId, batchNumber, medicineId, medicineName, quantity, reason } = req.body;
+
+  if (!invoiceNumber || !invoiceNumber.trim()) {
+    return ApiResponse.error(res, 'Original sales invoice number is required for customer return.', ['Missing invoiceNumber'], 400);
+  }
+
+  const query = { invoiceNumber: { $regex: new RegExp(`^${invoiceNumber.trim()}$`, 'i') } };
+  const sale = await Sale.findOne(query);
+
+  if (!sale) {
+    return ApiResponse.error(res, `Invoice #${invoiceNumber} not found in sales history.`, ['Invoice not found'], 404);
+  }
+
+  const cleanMedicineText = (str) => {
+    if (!str || typeof str !== 'string') return '';
+    return str.toLowerCase().replace(/\[object object\]/gi, '').replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const extractCleanId = (val) => {
+    if (!val) return '';
+    if (typeof val === 'object' && val !== null) {
+      return (val._id || val.id || val.medicineId || '').toString().trim().toLowerCase();
+    }
+    const s = String(val).trim().toLowerCase();
+    if (s === '[object object]') return '';
+    return s;
+  };
+
+  // Find matching item in sale.items ensuring it genuinely matches the specific medicine being adjusted
+  const itemIndex = sale.items.findIndex((it) => {
+    // 1. Check Batch Number if provided
+    const bBatch = (batchNumber || '').trim().toLowerCase();
+    const itBatch = (it.batchNumber || it.batchNo || it.batchId || '').trim().toLowerCase();
+    if (bBatch && itBatch && bBatch === itBatch) {
+      return true;
+    }
+
+    // 2. Check Medicine ID if provided (strictly ignoring [object Object])
+    const bMedId = extractCleanId(medicineId || batchId);
+    const itMedId = extractCleanId(it.medicineId || it.medicineCode);
+    if (bMedId && itMedId && bMedId === itMedId) {
+      return true;
+    }
+
+    // 3. Check Medicine Name (Strict primary token match, not loose substring)
+    const bName = cleanMedicineText(medicineName);
+    const itName = cleanMedicineText(it.medicineName || it.name);
+    if (bName && itName) {
+      if (bName === itName) return true;
+      const bTokens = bName.split(' ').filter((w) => w.length >= 3);
+      const itTokens = itName.split(' ').filter((w) => w.length >= 3);
+      if (bTokens.length > 0 && itTokens.length > 0 && bTokens[0] === itTokens[0]) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+
+  if (itemIndex === -1) {
+    const invoiceMedicineNames = sale.items.map((i) => i.medicineName).join(', ');
+    return ApiResponse.error(
+      res,
+      `Invoice #${sale.invoiceNumber} is for '${invoiceMedicineNames}' and does NOT contain '${medicineName || 'this medicine'}'. Please select the correct invoice.`,
+      ['Item not found on specified invoice'],
+      400
+    );
+  }
+
+  const item = sale.items[itemIndex];
+  const returnQty = Math.max(1, Math.min(Number(quantity) || item.quantity, item.quantity));
+
+  // 1. Adjust Batch Stock
+  let targetBatch = null;
+  if (batchId) {
+    const isObjId = mongoose.Types.ObjectId.isValid(batchId);
+    targetBatch = await Batch.findOne(isObjId ? { $or: [{ _id: batchId }, { batchId }] } : { batchId });
+  }
+  if (!targetBatch && (batchNumber || item.batchNumber)) {
+    targetBatch = await Batch.findOne({ batchNumber: batchNumber || item.batchNumber });
+  }
+
+  if (targetBatch) {
+    const prevQty = Number(targetBatch.quantity) || 0;
+    targetBatch.quantity = prevQty + returnQty;
+    targetBatch.updatedBy = req.user?._id || null;
+    await targetBatch.save();
+
+    // Log StockHistory audit record
+    await StockHistory.create({
+      stockHistoryId: `HIST-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      medicineId: targetBatch.medicineCode || targetBatch.medicineId?.toString() || item.medicineId,
+      batchId: targetBatch.batchId,
+      previousQuantity: prevQty,
+      changedQuantity: returnQty,
+      newQuantity: targetBatch.quantity,
+      actionType: 'RETURN',
+      employeeId: req.user?.username || req.user?.name || 'STAFF-01',
+      employeeName: req.user?.name || 'Staff Pharmacist',
+      reason: reason?.trim() || `Customer return to stock (Invoice: #${sale.invoiceNumber})`,
+      dateTime: new Date(),
+    });
+  }
+
+  // 2. Remove or update medicine in the sales record & invoice
+  let isEntireSaleRemoved = false;
+  let updatedSale = null;
+
+  if (item.quantity <= returnQty) {
+    // Remove the medicine from the invoice items array
+    sale.items.splice(itemIndex, 1);
+    await SaleItem.deleteMany({ saleId: sale._id, batchNumber: item.batchNumber });
+  } else {
+    // Partial return: deduct quantity and recompute line total
+    item.quantity -= returnQty;
+    item.subtotal = Math.round(item.quantity * item.unitPrice * 100) / 100;
+    const discountAmt = Math.round(((item.subtotal * (item.discountPercent || 0)) / 100) * 100) / 100;
+    item.discountAmount = discountAmt;
+    item.total = Math.round((item.subtotal - discountAmt) * 100) / 100;
+    item.finalTotal = item.total;
+
+    await SaleItem.updateOne(
+      { saleId: sale._id, batchNumber: item.batchNumber },
+      { $set: { quantity: item.quantity, subtotal: item.subtotal, total: item.total } }
+    );
+  }
+
+  if (sale.items.length === 0) {
+    // When all medicines are removed from the invoice, remove it from sales history so reports update cleanly
+    await Sale.deleteOne({ _id: sale._id });
+    await Invoice.deleteOne({ saleId: sale._id });
+    isEntireSaleRemoved = true;
+  } else {
+    const newSubtotal = sale.items.reduce((sum, it) => sum + (Number(it.subtotal) || 0), 0);
+    const newDiscount = sale.items.reduce((sum, it) => sum + (Number(it.discountAmount) || 0), 0);
+    const newGrandTotal = Math.max(0, Math.round((newSubtotal - newDiscount) * 100) / 100);
+
+    sale.subtotal = Math.round(newSubtotal * 100) / 100;
+    sale.totalDiscount = Math.round(newDiscount * 100) / 100;
+    sale.discountAmount = sale.totalDiscount;
+    sale.grandTotal = newGrandTotal;
+    sale.finalAmount = newGrandTotal;
+    await sale.save();
+
+    await Invoice.updateOne(
+      { saleId: sale._id },
+      {
+        $set: {
+          items: sale.items,
+          subtotal: sale.subtotal,
+          discountAmount: sale.discountAmount,
+          total: sale.grandTotal,
+        },
+      }
+    );
+    updatedSale = sale;
+  }
+
+  return ApiResponse.success(
+    res,
+    `Customer return of ${returnQty} units processed successfully. Medicine removed from sales history and returned to stock.`,
+    {
+      invoiceNumber: sale.invoiceNumber,
+      returnedQuantity: returnQty,
+      isEntireSaleRemoved,
+      updatedSale,
+      updatedBatch: targetBatch,
+    }
+  );
+});
+
 module.exports = {
   createSale,
   checkoutSale,
@@ -362,4 +543,5 @@ module.exports = {
   getTodaySales,
   getSalesSummary,
   getSaleById,
+  returnSaleItem,
 };

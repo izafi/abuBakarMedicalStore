@@ -839,10 +839,14 @@ export const Dashboard = () => {
               toast.showError(err.message);
             }
           }}
-          onAdjustStock={async ({ batchId, delta, actionType, reason }) => {
+          onAdjustStock={async ({ batchId, delta, actionType, reason, isCustomerReturn }) => {
             try {
-              await adjustBatchStock(batchId, delta, actionType, reason);
-              toast.showSuccess('Stock adjustment applied!');
+              if (!isCustomerReturn) {
+                await adjustBatchStock(batchId, delta, actionType, reason);
+                toast.showSuccess('Stock adjustment applied!');
+              } else {
+                toast.showSuccess('Customer return processed successfully!');
+              }
             } catch (err) {
               toast.showError(err.message);
             }

@@ -175,12 +175,18 @@ export const Inventory = () => {
     }
   };
 
-  const handleApplyAdjustment = async ({ batchId, delta, actionType, reason }) => {
+  const handleApplyAdjustment = async ({ batchId, delta, actionType, reason, isCustomerReturn, invoiceNumber }) => {
     try {
-      await adjustBatchStock(batchId, delta, actionType, reason);
-      toast.showSuccess(
-        `Stock successfully ${delta > 0 ? 'increased' : 'reduced'} by ${Math.abs(delta)} units.`
-      );
+      if (isCustomerReturn) {
+        toast.showSuccess(
+          `Customer return processed: ${Math.abs(delta)} units returned to stock and removed from Invoice #${invoiceNumber || ''}.`
+        );
+      } else {
+        await adjustBatchStock(batchId, delta, actionType, reason);
+        toast.showSuccess(
+          `Stock successfully ${delta > 0 ? 'increased' : 'reduced'} by ${Math.abs(delta)} units.`
+        );
+      }
       setAdjustingBatch(null);
     } catch (err) {
       toast.showError(err.message);

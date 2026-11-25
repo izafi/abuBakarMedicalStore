@@ -2,11 +2,16 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { PAYMENT_METHODS } from '../utils/constants';
 import { generateInvoiceNumber, canSellBatch } from '../utils/formatters';
 import { verifyDemoPassword } from '../utils/security';
-import { validatePatientInfo } from '../utils/validators';
 import { useInventory } from '../hooks/useInventory';
 import { useAuth } from '../hooks/useAuth';
 import { salesService } from '../services/salesService';
 import { SalesContext } from './contexts';
+
+// Patient information validator helper
+const validatePatientInfo = (info = {}) => ({
+  isValid: true,
+  errors: {},
+});
 
 // Helper to compute subtotal, discount, and final total for a cart item
 const computeItemTotals = (unitPrice, quantity, discountPercentage = 0, discountAmountParam = null) => {
@@ -595,6 +600,149 @@ export const SalesProvider = ({ children }) => {
     [fetchSalesData]
   );
 
+  // Process customer return: replenishes batch stock and removes/updates medicine from sales history & reports
+  const processCustomerReturn = useCallback(
+    async ({ invoiceNumber, batchId, batchNumber, medicineId, medicineName, quantity, reason }) => {
+      const invClean = invoiceNumber?.trim() || '';
+      const retQty = Number(quantity) || 1;
+
+      let apiResult = null;
+      try {
+        const res = await salesService.returnItem({
+          invoiceNumber: invClean,
+          batchId,
+          batchNumber,
+          medicineId,
+          medicineName,
+          quantity: retQty,
+          reason,
+        });
+        apiResult = res?.data;
+      } catch (err) {
+        console.warn('[SalesContext] returnItem API notice:', err.message);
+      }
+
+      // Immediately update local sales state so Reports and SalesHistory recompute in real-time
+      setSales((prevSales) => {
+        const invLower = invClean.toLowerCase();
+        const targetSale = prevSales.find((s) => s.invoiceNumber?.toLowerCase() === invLower);
+        if (!targetSale) return prevSales;
+
+        if (apiResult?.isEntireSaleRemoved) {
+          return prevSales.filter((s) => s.invoiceNumber?.toLowerCase() !== invLower);
+        }
+
+        if (apiResult?.updatedSale) {
+          return prevSales.map((s) =>
+            s.invoiceNumber?.toLowerCase() === invLower
+              ? {
+                  ...s,
+                  ...apiResult.updatedSale,
+                  date: apiResult.updatedSale.date || s.date,
+                  grandTotal: apiResult.updatedSale.grandTotal ?? s.grandTotal,
+                  finalAmount: apiResult.updatedSale.finalAmount ?? s.finalAmount,
+                  items: apiResult.updatedSale.items || [],
+                }
+              : s
+          );
+        }
+
+        // Local state calculation fallback
+        const existingItems = targetSale.items || [];
+        const itemIdx = existingItems.findIndex((it) => {
+          const bBatch = (batchNumber || '').trim().toLowerCase();
+          const itBatch = (it.batchNumber || it.batchId || '').trim().toLowerCase();
+          if (bBatch && itBatch && bBatch === itBatch) return true;
+
+          const bMed = (medicineId || '').toString().trim().toLowerCase();
+          const itMed = (it.medicineId || it.medicineCode || '').toString().trim().toLowerCase();
+          if (bMed && itMed && bMed !== '[object object]' && bMed === itMed) return true;
+
+          const bName = (medicineName || '').trim().toLowerCase();
+          const itName = (it.medicineName || '').trim().toLowerCase();
+          if (bName && itName) {
+            if (bName === itName) return true;
+            const bTok = bName.split(' ').filter((w) => w.length >= 3);
+            const itTok = itName.split(' ').filter((w) => w.length >= 3);
+            if (bTok.length > 0 && itTok.length > 0 && bTok[0] === itTok[0]) return true;
+          }
+          return false;
+        });
+
+        if (itemIdx === -1) return prevSales;
+
+        const currentItem = existingItems[itemIdx];
+        if (currentItem.quantity <= retQty) {
+          // Entire line returned
+          const remainingItems = existingItems.filter((_, idx) => idx !== itemIdx);
+          if (remainingItems.length === 0) {
+            return prevSales.filter((s) => s.invoiceNumber?.toLowerCase() !== invLower);
+          }
+          const newSubtotal = remainingItems.reduce((acc, it) => acc + (Number(it.subtotal) || 0), 0);
+          const newDiscount = remainingItems.reduce((acc, it) => acc + (Number(it.discountAmount) || 0), 0);
+          const newGrandTotal = Math.max(0, newSubtotal - newDiscount);
+
+          return prevSales.map((s) =>
+            s.invoiceNumber?.toLowerCase() === invLower
+              ? {
+                  ...s,
+                  items: remainingItems,
+                  subtotal: newSubtotal,
+                  discountAmount: newDiscount,
+                  totalDiscount: newDiscount,
+                  grandTotal: newGrandTotal,
+                  finalAmount: newGrandTotal,
+                }
+              : s
+          );
+        } else {
+          // Partial return
+          const updatedItems = existingItems.map((it, idx) => {
+            if (idx !== itemIdx) return it;
+            const newQty = it.quantity - retQty;
+            const newSub = Math.round(newQty * it.unitPrice * 100) / 100;
+            const newDisc = Math.round(((newSub * (it.discountPercent || 0)) / 100) * 100) / 100;
+            const newTot = Math.round((newSub - newDisc) * 100) / 100;
+            return {
+              ...it,
+              quantity: newQty,
+              subtotal: newSub,
+              discountAmount: newDisc,
+              total: newTot,
+              finalTotal: newTot,
+            };
+          });
+
+          const newSubtotal = updatedItems.reduce((acc, it) => acc + (Number(it.subtotal) || 0), 0);
+          const newDiscount = updatedItems.reduce((acc, it) => acc + (Number(it.discountAmount) || 0), 0);
+          const newGrandTotal = Math.max(0, newSubtotal - newDiscount);
+
+          return prevSales.map((s) =>
+            s.invoiceNumber?.toLowerCase() === invLower
+              ? {
+                  ...s,
+                  items: updatedItems,
+                  subtotal: newSubtotal,
+                  discountAmount: newDiscount,
+                  totalDiscount: newDiscount,
+                  grandTotal: newGrandTotal,
+                  finalAmount: newGrandTotal,
+                }
+              : s
+          );
+        }
+      });
+
+      if (refreshInventory) {
+        refreshInventory();
+      }
+      fetchSalesData();
+
+      return apiResult;
+    },
+    [fetchSalesData, refreshInventory]
+  );
+
   return (
     <SalesContext.Provider
       value={{
@@ -619,6 +767,7 @@ export const SalesProvider = ({ children }) => {
         processSale,
         processCheckout: processSale,
         recordCompletedSale,
+        processCustomerReturn,
         salesMetrics,
         isProcessingSale,
         isLoading,

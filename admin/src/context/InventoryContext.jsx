@@ -237,7 +237,7 @@ export const InventoryProvider = ({ children }) => {
       const payload = {
         name: medicineData.name.trim(),
         genericName: medicineData.genericName.trim(),
-        brand: medicineData.brand?.trim() || medicineData.name.trim(),
+        brand: medicineData.brand?.trim() || '',
         formula: medicineData.formula?.trim() || medicineData.genericName.trim(),
         strength: medicineData.strength?.trim() || 'N/A',
         type: medicineData.type || 'Tablet',

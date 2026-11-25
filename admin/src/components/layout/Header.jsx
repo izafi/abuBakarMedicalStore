@@ -55,6 +55,7 @@ export const Header = ({
   const getPageTitle = () => {
     switch (location.pathname) {
       case '/':
+      case '/counter':
         return 'Medicine Counter';
       case '/medicines':
         return 'Medicines Management';
