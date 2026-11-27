@@ -15,7 +15,7 @@ const {
   getCounterCatalog,
 } = require('../controller/medicineCounterController');
 const { authenticate, optionalAuth } = require('../middleware/authMiddleware');
-const { checkPermission } = require('../middleware/permissionMiddleware');
+const { checkPermission, requireAdmin } = require('../middleware/permissionMiddleware');
 const {
   validateCreateMedicine,
   validateUpdateMedicine,
@@ -57,7 +57,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  checkPermission('medicines', 'delete'),
+  requireAdmin,
   deleteMedicine
 );
 

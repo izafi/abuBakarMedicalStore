@@ -273,15 +273,13 @@ export const Header = ({
                 <div className="w-8 h-8 rounded-full bg-[#E8F6EF] text-[#1C9A58] border border-[#BDE8D2] flex items-center justify-center font-bold text-xs shrink-0">
                   {currentUser?.name ? currentUser.name.charAt(0) : 'U'}
                 </div>
-                <div className="hidden md:block text-left pr-1">
-                  <p className="text-xs font-bold text-gray-900 leading-tight">
+                <div className="hidden md:flex items-center gap-2 text-left pr-1">
+                  <span className="text-xs font-bold text-gray-900 whitespace-nowrap">
                     {currentUser?.name || 'Staff User'}
-                  </p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <Badge variant={getRoleBadgeVariant(currentUser?.role)} size="sm">
-                      {currentUser?.role || 'Pharmacist'}
-                    </Badge>
-                  </div>
+                  </span>
+                  <Badge variant={getRoleBadgeVariant(currentUser?.role)} size="sm">
+                    {currentUser?.role || 'Pharmacist'}
+                  </Badge>
                 </div>
                 <ChevronDown className="w-4 h-4 text-gray-400" />
               </button>

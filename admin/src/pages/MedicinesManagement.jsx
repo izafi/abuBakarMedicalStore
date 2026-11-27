@@ -40,7 +40,7 @@ export const MedicinesManagement = () => {
     deleteBatch,
     adjustBatchStock,
   } = useInventory();
-  const { hasPermission } = useAuth();
+  const { hasPermission, isAdmin } = useAuth();
   const toast = useToast();
 
   // Filters & Search
@@ -142,6 +142,10 @@ export const MedicinesManagement = () => {
   // Handle Delete
   const handleConfirmDelete = () => {
     if (!deleteTarget) return;
+    if (!isAdmin) {
+      toast.showError('Access Denied: Only administrators are authorized to delete medicines.');
+      return;
+    }
     try {
       deleteMedicine(deleteTarget.medicineId);
       toast.showSuccess(`Deleted "${deleteTarget.name}" and removed all linked batches.`);

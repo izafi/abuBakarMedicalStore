@@ -519,6 +519,16 @@ const updateBatch = asyncHandler(async (req, res) => {
 const deleteBatch = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
+  // Rule: Only administrators are authorized to delete stock batches
+  if (req.user && req.user.role !== 'Admin') {
+    return ApiResponse.error(
+      res,
+      'Operation Denied: Only administrators are authorized to delete stock batches.',
+      ['Administrator privileges required to delete stock'],
+      403
+    );
+  }
+
   const isObjectId = mongoose.Types.ObjectId.isValid(id);
   const query = isObjectId ? { $or: [{ _id: id }, { batchId: id }] } : { batchId: id };
 
@@ -528,43 +538,25 @@ const deleteBatch = asyncHandler(async (req, res) => {
     return ApiResponse.error(res, 'Batch not found', ['No batch matches identifier'], 404);
   }
 
-  // Business Rule: Do not delete batches with sales history
-  const hasSalesHistory = await Sale.exists({
-    $or: [
-      { 'items.batchId': batch.batchId },
-      { 'items.batchId': batch._id.toString() },
-      { 'items.batchNumber': batch.batchNumber },
-    ],
-  });
-
-  if (hasSalesHistory) {
-    return ApiResponse.error(
-      res,
-      `Operation Denied: Cannot delete batch '${batch.batchNumber}' because it has recorded sales history. Disposal or stock adjustment must be logged instead to preserve legal pharmacy audit records.`,
-      ['Batch has historical sales references'],
-      400
-    );
-  }
-
-  // Log stock removal if quantity > 0
+  // Log stock removal if quantity > 0 to preserve audit trail
   if (batch.quantity > 0) {
     await StockHistory.create({
       stockHistoryId: `HIST-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
-      medicineId: batch.medicineCode || batch.medicineId.toString(),
+      medicineId: batch.medicineCode || (batch.medicineId ? batch.medicineId.toString() : 'MED-DISCARD'),
       batchId: batch.batchId,
       previousQuantity: batch.quantity,
       changedQuantity: -batch.quantity,
       newQuantity: 0,
       actionType: 'Disposal / Waste',
-      employeeId: req.user?.username || 'STAFF-01',
-      employeeName: req.user?.name || 'Staff Pharmacist',
-      reason: req.body?.reason || 'Batch permanently deleted/discarded',
+      employeeId: req.user?.username || req.user?.employeeId || 'ADMIN',
+      employeeName: req.user?.name || 'Administrator',
+      reason: req.body?.reason || 'Batch permanently discarded from stock by Administrator',
     });
   }
 
   await batch.deleteOne();
 
-  return ApiResponse.success(res, `Batch '${batch.batchNumber}' deleted successfully`, {
+  return ApiResponse.success(res, `Batch '${batch.batchNumber}' deleted successfully from stock`, {
     deleted: true,
     batchId: batch.batchId,
     batchNumber: batch.batchNumber,

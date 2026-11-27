@@ -1,6 +1,10 @@
 export const INITIAL_CATEGORIES = [
   'Antibiotics',
+  'Antibacterial',
   'Pain Relief & Analgesics',
+  'Analgesic / Anti-inflammatory',
+  'Anti-inflammatory',
+  'Anti-inflammatory / Antibacterial',
   'Cardiovascular & Blood Pressure',
   'Diabetes Care',
   'Gastrointestinal & Antacids',

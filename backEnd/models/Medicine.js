@@ -10,6 +10,7 @@ const MEDICINE_TYPES = [
   'Drops',
   'Inhaler',
   'Ointment',
+  'Gel',
   'Other',
 ];
 

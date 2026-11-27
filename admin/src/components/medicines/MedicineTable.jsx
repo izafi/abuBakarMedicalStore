@@ -12,7 +12,7 @@ export const MedicineTable = ({
   onDelete,
   pageSize = 30,
 }) => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, isAdmin } = useAuth();
   const [itemsPerPage, setItemsPerPage] = useState(pageSize || 30);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState('name');
@@ -111,7 +111,7 @@ export const MedicineTable = ({
 
               {/* Storage Location */}
               <th className="py-2.5 px-3 w-24 whitespace-nowrap text-black font-bold">
-                <span>Location</span>
+                <span>Rack/Shelf</span>
               </th>
 
               {/* Actions */}
@@ -228,7 +228,7 @@ export const MedicineTable = ({
                           </button>
                         )}
 
-                        {hasPermission('medicines', 'delete') && (
+                        {isAdmin && (
                           <button
                             type="button"
                             onClick={() => onDelete(med)}

@@ -22,7 +22,7 @@ export const BatchTable = ({
   onDeleteBatch,
   onAdjustStock,
 }) => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, isAdmin } = useAuth();
 
   const [sortField, setSortField] = useState('expiryDate');
   const [sortDirection, setSortDirection] = useState('asc'); // 'asc' | 'desc'
@@ -30,7 +30,7 @@ export const BatchTable = ({
   const [itemsPerPage, setItemsPerPage] = useState(30);
 
   const canEdit = hasPermission('inventory', 'edit');
-  const canDelete = hasPermission('inventory', 'delete');
+  const canDelete = isAdmin;
 
   const handleSort = (field) => {
     if (sortField === field) {

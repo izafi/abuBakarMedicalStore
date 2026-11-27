@@ -199,20 +199,26 @@ const searchMedicines = asyncHandler(async (req, res) => {
 });
 
 const DEFAULT_CATEGORIES = [
-  'Antibiotics',
+  'Analgesic / Anti-inflammatory',
   'Analgesics / Antipyretics',
-  'NSAIDs',
-  'Gastrointestinal',
-  'Antihistamines',
-  'Cardiovascular',
+  'Anti-inflammatory',
+  'Anti-inflammatory / Antibacterial',
+  'Antibacterial',
+  'Antibiotics',
   'Antidiabetic',
-  'Respiratory',
-  'Dermatological',
-  'Vitamins & Supplements',
-  'Neurological / Psychiatric',
-  'Ophthalmic / Otic',
-  'Antiviral',
   'Antifungal',
+  'Antihistamines',
+  'Antiseptics & Disinfectants',
+  'Antiviral',
+  'Cardiovascular',
+  'Dermatological',
+  'Gastrointestinal',
+  'Hormones & Endocrine',
+  'Neurological / Psychiatric',
+  'NSAIDs',
+  'Ophthalmic / Otic',
+  'Respiratory',
+  'Vitamins & Supplements',
   'Other',
 ];
 
@@ -423,6 +429,19 @@ const updateMedicine = asyncHandler(async (req, res) => {
 
   await medicine.save();
 
+  // If rack or shelf were updated, also update linked batches location
+  if (rack !== undefined || shelf !== undefined) {
+    const batchUpdate = {};
+    if (rack !== undefined) batchUpdate.rack = medicine.rack;
+    if (shelf !== undefined) batchUpdate.shelf = medicine.shelf;
+    batchUpdate.location = `${medicine.rack || 'Rack A-1'}, ${medicine.shelf || 'Shelf 1'}`;
+
+    await Batch.updateMany(
+      { $or: [{ medicineId: medicine._id }, { medicineCode: medicine.medicineId }] },
+      { $set: batchUpdate }
+    );
+  }
+
   return ApiResponse.success(res, `Medicine '${medicine.name}' updated successfully`, medicine);
 });
 
@@ -435,6 +454,16 @@ const updateMedicine = asyncHandler(async (req, res) => {
 const deleteMedicine = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
+  // Rule: Only administrators are authorized to delete medicines
+  if (req.user && req.user.role !== 'Admin') {
+    return ApiResponse.error(
+      res,
+      'Operation Denied: Only administrators are authorized to delete medicines from the catalog.',
+      ['Administrator privileges required'],
+      403
+    );
+  }
+
   const isObjectId = mongoose.Types.ObjectId.isValid(id);
   const query = isObjectId ? { $or: [{ _id: id }, { medicineId: id }] } : { medicineId: id };
 
@@ -444,53 +473,15 @@ const deleteMedicine = asyncHandler(async (req, res) => {
     return ApiResponse.error(res, 'Medicine not found', ['No medicine matches identifier'], 404);
   }
 
-  // Check historical references in Batches or Sales
-  const hasBatches = await Batch.exists({
-    $or: [
-      { medicineId: medicine._id },
-      { medicineCode: medicine.medicineId },
-    ],
+  // Remove all linked batches for this medicine
+  await Batch.deleteMany({
+    $or: [{ medicineId: medicine._id }, { medicineCode: medicine.medicineId }],
   });
 
-  const hasSales = await Sale.exists({
-    $or: [
-      { 'items.medicineId': medicine.medicineId },
-      { 'items.medicineId': medicine._id.toString() },
-    ],
-  });
-
-  const isSoftDeleteRequested = req.query.soft === 'true' || req.query.archive === 'true';
-
-  // Rule: Do not permanently delete medicines having historical batch or sales references
-  if (hasBatches || hasSales || isSoftDeleteRequested) {
-    medicine.isActive = false;
-    medicine.updatedBy = req.user?._id || null;
-    await medicine.save();
-
-    const reason = hasBatches
-      ? 'existing batches'
-      : hasSales
-      ? 'historical sales records'
-      : 'archive request';
-
-    return ApiResponse.success(
-      res,
-      `Medicine has ${reason} and was safely archived (soft-deleted) to protect historical audits.`,
-      {
-        archived: true,
-        deleted: false,
-        id: medicine._id,
-        medicineId: medicine.medicineId,
-        name: medicine.name,
-        isActive: medicine.isActive,
-      }
-    );
-  }
-
-  // If completely unreferenced, permanently remove
+  // Permanently remove the medicine
   await medicine.deleteOne();
 
-  return ApiResponse.success(res, `Medicine '${medicine.name}' permanently deleted successfully.`, {
+  return ApiResponse.success(res, `Medicine '${medicine.name}' and its stock batches deleted successfully.`, {
     archived: false,
     deleted: true,
     id: medicine._id,

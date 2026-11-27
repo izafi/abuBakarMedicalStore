@@ -54,7 +54,7 @@ export const MedicineCounter = () => {
     refreshInventory,
   } = useInventory();
   const { addToCart, orderSummary, recentSales, refreshSales } = useSales();
-  const { currentUser, hasPermission } = useAuth();
+  const { currentUser, hasPermission, isAdmin } = useAuth();
   const toast = useToast();
 
   // Instantly keep counter sales and inventory in sync without refresh
@@ -67,7 +67,7 @@ export const MedicineCounter = () => {
   const canAddSale = hasPermission('sales', 'add');
   const canAddMedicine = hasPermission('medicines', 'add');
   const canEditMedicine = hasPermission('medicines', 'edit');
-  const canDeleteMedicine = hasPermission('medicines', 'delete');
+  const canDeleteMedicine = isAdmin;
 
   // Filters & Search State
   const [searchQuery, setSearchQuery] = useState('');

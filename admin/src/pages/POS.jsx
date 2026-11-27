@@ -115,10 +115,14 @@ const highlightMatch = (text = '', query = '') => {
  */
 const ProductSearchCell = ({
   row,
+  rowIndex,
+  rowsCount,
   medicines,
   sellableBatchesMap,
   updateRowField,
   handleSelectProduct,
+  onNavigateGrid,
+  onEnterNewRow,
 }) => {
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
@@ -257,29 +261,91 @@ const ProductSearchCell = ({
   // Full keyboard navigation
   const handleKeyDown = (e) => {
     const hasQuery = (row.productQuery || '').trim().length > 0;
-    if (!row.isSearchOpen || !hasQuery) {
-      if ((e.key === 'ArrowDown' || e.key === 'Enter') && hasQuery) {
-        updateCoords();
-        updateRowField(row.rowId, 'isSearchOpen', true);
+
+    // 1. If suggestion dropdown is open with matches:
+    if (row.isSearchOpen && hasQuery && filteredMedicines.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev + 1) % filteredMedicines.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev - 1 + filteredMedicines.length) % filteredMedicines.length);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (filteredMedicines[selectedIndex]) {
+          playPosBeep(850, 0.08);
+          // Enter selects product AND automatically enters the new medicine line
+          handleSelectProduct(row.rowId, filteredMedicines[selectedIndex], null, true);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        updateRowField(row.rowId, 'isSearchOpen', false);
+        return;
+      }
+    }
+
+    // 2. When dropdown is closed or empty:
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // If dropdown is open and there's a match, pick it
+      if (row.isSearchOpen && filteredMedicines.length > 0 && filteredMedicines[selectedIndex]) {
+        playPosBeep(850, 0.08);
+        handleSelectProduct(row.rowId, filteredMedicines[selectedIndex], null, true);
+      } else {
+        // Otherwise pressing Enter enters the new medicine row directly!
+        if (onEnterNewRow) {
+          onEnterNewRow(rowIndex);
+        }
       }
       return;
     }
 
+    // 3. Arrow Navigation throughout the grid
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % Math.max(1, filteredMedicines.length));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + filteredMedicines.length) % Math.max(1, filteredMedicines.length));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (filteredMedicines.length > 0 && filteredMedicines[selectedIndex]) {
-        playPosBeep(850, 0.08);
-        handleSelectProduct(row.rowId, filteredMedicines[selectedIndex]);
+      if (onNavigateGrid) {
+        onNavigateGrid(rowIndex, 0, 'down');
       }
-    } else if (e.key === 'Escape') {
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
       e.preventDefault();
-      updateRowField(row.rowId, 'isSearchOpen', false);
+      if (onNavigateGrid) {
+        onNavigateGrid(rowIndex, 0, 'up');
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowRight') {
+      const isAtEnd =
+        inputRef.current &&
+        (inputRef.current.selectionEnd === (row.productQuery || '').length ||
+          inputRef.current.selectionStart === inputRef.current.selectionEnd);
+      if (isAtEnd || !row.isSearchOpen) {
+        e.preventDefault();
+        if (onNavigateGrid) {
+          onNavigateGrid(rowIndex, 0, 'right');
+        }
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowLeft') {
+      const isAtStart = inputRef.current && inputRef.current.selectionStart === 0;
+      if (isAtStart && rowIndex > 0) {
+        e.preventDefault();
+        if (onNavigateGrid) {
+          onNavigateGrid(rowIndex, 0, 'left');
+        }
+      }
+      return;
     }
   };
 
@@ -287,10 +353,12 @@ const ProductSearchCell = ({
     <td className="py-2 px-2.5 relative">
       <input
         ref={inputRef}
+        data-pos-row={rowIndex}
+        data-pos-col={0}
         type="text"
         value={row.productQuery}
         onFocus={() => {
-          if ((row.productQuery || '').trim().length > 0) {
+          if ((row.productQuery || '').trim().length > 0 && !row.selectedMedicineId) {
             updateCoords();
             updateRowField(row.rowId, 'isSearchOpen', true);
           }
@@ -600,6 +668,14 @@ export const POS = () => {
     }
   }, [currentUser?.name, orderTakenBy]);
 
+  // Autofocus the first product row on POS mount so staff can type immediately
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      focusPosCell(0, 0);
+    }, 150);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Dynamic Pack types extracted from database medicines + standard medical formats
   const dynamicPackOptions = useMemo(() => {
     const fromDb = medicines
@@ -616,6 +692,7 @@ export const POS = () => {
       'Injection',
       'Cream',
       'Ointment',
+      'Gel',
       'Drops',
       'Sachet',
       'Unit',
@@ -639,8 +716,41 @@ export const POS = () => {
     return map;
   }, [batches]);
 
-  // Handle row product selection
-  const handleSelectProduct = (rowId, med, specificBatch = null) => {
+  // Focus target cell in products table
+  const focusPosCell = (rIdx, cIdx) => {
+    const el = document.querySelector(`[data-pos-row="${rIdx}"][data-pos-col="${cIdx}"]`);
+    if (el) {
+      el.focus();
+      if (el.tagName === 'INPUT' && typeof el.select === 'function') {
+        el.select();
+      }
+      return true;
+    }
+    return false;
+  };
+
+  // Add new medicine row and immediately focus its product search field
+  const handleAddNewMedicineRow = (fromRowIndex = null) => {
+    setRows((prev) => {
+      const lastRow = prev[prev.length - 1];
+      if (lastRow && !lastRow.selectedMedicineId && !lastRow.productQuery.trim()) {
+        setTimeout(() => {
+          focusPosCell(prev.length - 1, 0);
+        }, 50);
+        return prev;
+      }
+
+      const newRow = createEmptyRow(Date.now() + Math.random());
+      const nextRows = [...prev, newRow];
+      setTimeout(() => {
+        focusPosCell(nextRows.length - 1, 0);
+      }, 50);
+      return nextRows;
+    });
+  };
+
+  // Handle row product selection (supports auto-adding new row on Enter)
+  const handleSelectProduct = (rowId, med, specificBatch = null, autoAddNew = false) => {
     const medId = med.medicineId || med.id || med._id;
     const medBatches = sellableBatchesMap[medId] || [];
 
@@ -650,8 +760,8 @@ export const POS = () => {
     const unitPrice = activeBatch ? Number(activeBatch.sellingPrice || 0) : Number(med.sellingPrice || 0);
     const purchaseCost = activeBatch ? Number(activeBatch.purchasePrice || 0) : Number(med.purchasePrice || 0);
 
-    setRows((prev) =>
-      prev.map((r) => {
+    setRows((prev) => {
+      const updated = prev.map((r) => {
         if (r.rowId === rowId) {
           const pcsVal = Math.max(1, parseFloat(r.pcs) || 1);
           const qty = 1;
@@ -677,8 +787,95 @@ export const POS = () => {
           };
         }
         return r;
-      })
-    );
+      });
+
+      if (autoAddNew) {
+        const lastRow = updated[updated.length - 1];
+        if (lastRow && !lastRow.selectedMedicineId && !lastRow.productQuery.trim()) {
+          setTimeout(() => {
+            focusPosCell(updated.length - 1, 0);
+          }, 50);
+          return updated;
+        }
+
+        const newRow = createEmptyRow(Date.now() + Math.random());
+        const nextRows = [...updated, newRow];
+        setTimeout(() => {
+          focusPosCell(nextRows.length - 1, 0);
+        }, 50);
+        return nextRows;
+      }
+
+      return updated;
+    });
+  };
+
+  // Seamless Arrow Key & Enter Navigation throughout table
+  const handleGridNavigation = (rIdx, cIdx, direction) => {
+    if (direction === 'up') {
+      if (rIdx > 0) {
+        focusPosCell(rIdx - 1, cIdx);
+      }
+    } else if (direction === 'down') {
+      if (rIdx < rows.length - 1) {
+        focusPosCell(rIdx + 1, cIdx);
+      } else if (rows[rIdx]?.selectedMedicineId) {
+        handleAddNewMedicineRow(rIdx);
+      }
+    } else if (direction === 'left') {
+      if (cIdx > 0) {
+        focusPosCell(rIdx, cIdx - 1);
+      } else if (rIdx > 0) {
+        focusPosCell(rIdx - 1, 4);
+      }
+    } else if (direction === 'right') {
+      if (cIdx < 4) {
+        focusPosCell(rIdx, cIdx + 1);
+      } else if (rIdx < rows.length - 1) {
+        focusPosCell(rIdx + 1, 0);
+      }
+    }
+  };
+
+  const handleCellKeyDown = (e, rIdx, cIdx) => {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      handleGridNavigation(rIdx, cIdx, 'up');
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      handleGridNavigation(rIdx, cIdx, 'down');
+    } else if (e.key === 'ArrowLeft') {
+      const isInput = e.target.tagName === 'INPUT';
+      const selStart = isInput ? e.target.selectionStart : 0;
+      const isAllSelected = isInput && selStart === 0 && e.target.selectionEnd === (e.target.value || '').length;
+      if (!isInput || selStart === 0 || isAllSelected) {
+        e.preventDefault();
+        handleGridNavigation(rIdx, cIdx, 'left');
+      }
+    } else if (e.key === 'ArrowRight') {
+      const isInput = e.target.tagName === 'INPUT';
+      const selEnd = isInput ? e.target.selectionEnd : 0;
+      const valLen = isInput ? (e.target.value || '').length : 0;
+      const isAllSelected = isInput && e.target.selectionStart === 0 && selEnd === valLen;
+      if (!isInput || selEnd === valLen || isAllSelected) {
+        e.preventDefault();
+        handleGridNavigation(rIdx, cIdx, 'right');
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      // On Enter key in table cells: enter new medicine row or move to next line
+      if (rIdx < rows.length - 1) {
+        focusPosCell(rIdx + 1, 0);
+      } else {
+        handleAddNewMedicineRow(rIdx);
+      }
+    } else if (cIdx === 3 && (e.key === '+' || e.key === '=')) {
+      e.preventDefault();
+      updateRowField(rows[rIdx].rowId, 'qty', Math.min(rows[rIdx].stock || 99999, (Number(rows[rIdx].qty) || 1) + 1));
+    } else if (cIdx === 3 && (e.key === '-' || e.key === '_')) {
+      e.preventDefault();
+      updateRowField(rows[rIdx].rowId, 'qty', Math.max(1, (Number(rows[rIdx].qty) || 1) - 1));
+    }
   };
 
   // Row update helpers
@@ -707,7 +904,7 @@ export const POS = () => {
   };
 
   const handleAddRow = () => {
-    setRows((prev) => [...prev, createEmptyRow(Date.now() + Math.random())]);
+    handleAddNewMedicineRow();
   };
 
   const handleRemoveRow = (rowId) => {
@@ -1073,22 +1270,29 @@ export const POS = () => {
               </thead>
 
               <tbody className="divide-y divide-slate-200 bg-white">
-                {rows.map((row) => (
+                {rows.map((row, rowIndex) => (
                   <tr key={row.rowId} className="hover:bg-slate-50/70 transition-colors">
                     {/* 1. PRODUCT (Searchable dropdown outside of table via Portal) */}
                     <ProductSearchCell
                       row={row}
+                      rowIndex={rowIndex}
+                      rowsCount={rows.length}
                       medicines={medicines}
                       sellableBatchesMap={sellableBatchesMap}
                       updateRowField={updateRowField}
                       handleSelectProduct={handleSelectProduct}
+                      onNavigateGrid={handleGridNavigation}
+                      onEnterNewRow={handleAddNewMedicineRow}
                     />
 
                     {/* 2. PACK */}
                       <td className="py-2 px-2 w-28">
                         <select
+                          data-pos-row={rowIndex}
+                          data-pos-col={1}
                           value={row.pack}
                           onChange={(e) => updateRowField(row.rowId, 'pack', e.target.value)}
+                          onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 1)}
                           className="w-full h-8 px-2 text-xs font-bold bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-md text-black focus:outline-none focus:border-[#1C9A58] cursor-pointer transition-colors"
                         >
                           {dynamicPackOptions.map((p, idx) => (
@@ -1102,10 +1306,13 @@ export const POS = () => {
                       {/* 3. PCS */}
                       <td className="py-2 px-1 text-center w-14">
                         <input
+                          data-pos-row={rowIndex}
+                          data-pos-col={2}
                           type="number"
                           min="1"
                           value={row.pcs}
                           onChange={(e) => updateRowField(row.rowId, 'pcs', e.target.value)}
+                          onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 2)}
                           className="w-full h-8 text-center text-xs font-bold bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-md text-black focus:outline-none focus:border-[#1C9A58]"
                         />
                       </td>
@@ -1115,6 +1322,7 @@ export const POS = () => {
                         <div className="flex items-center justify-center">
                           <button
                             type="button"
+                            tabIndex={-1}
                             onClick={() => updateRowField(row.rowId, 'qty', Math.max(1, (Number(row.qty) || 1) - 1))}
                             className="w-5 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-l border-y border-l border-slate-300 transition-colors cursor-pointer select-none"
                             title="Decrease quantity"
@@ -1122,15 +1330,19 @@ export const POS = () => {
                             -
                           </button>
                           <input
+                            data-pos-row={rowIndex}
+                            data-pos-col={3}
                             type="number"
                             min="1"
                             max={row.stock || 99999}
                             value={row.qty}
                             onChange={(e) => updateRowField(row.rowId, 'qty', e.target.value)}
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 3)}
                             className="w-9 h-8 text-center text-xs font-bold bg-slate-50 hover:bg-white focus:bg-white border-y border-slate-300 text-black focus:outline-none focus:border-[#1C9A58]"
                           />
                           <button
                             type="button"
+                            tabIndex={-1}
                             onClick={() => updateRowField(row.rowId, 'qty', Math.min(row.stock || 99999, (Number(row.qty) || 1) + 1))}
                             className="w-5 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-r border-y border-r border-slate-300 transition-colors cursor-pointer select-none"
                             title="Increase quantity"
@@ -1149,10 +1361,13 @@ export const POS = () => {
                       <td className="py-2 px-2 text-right w-24">
                         <div className="flex justify-end">
                           <input
+                            data-pos-row={rowIndex}
+                            data-pos-col={4}
                             type="number"
                             step="0.01"
                             value={row.price}
                             onChange={(e) => updateRowField(row.rowId, 'price', e.target.value)}
+                            onKeyDown={(e) => handleCellKeyDown(e, rowIndex, 4)}
                             className="w-20 h-8 text-right font-mono text-xs font-bold bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded-md text-black focus:outline-none focus:border-[#1C9A58]"
                           />
                         </div>
@@ -1191,7 +1406,7 @@ export const POS = () => {
               className="text-xs font-bold text-[#1C9A58] bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg px-3 py-1.5 flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-2xs flex-1 sm:flex-none"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Add product <span className="hidden sm:inline">(F4)</span></span>
+              <span>Add product <span className="hidden sm:inline">(Enter / F4)</span></span>
             </button>
 
             <button

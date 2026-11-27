@@ -9,7 +9,7 @@ import { inventoryService } from '../services/inventoryService';
 import { InventoryContext } from './contexts';
 
 export const InventoryProvider = ({ children }) => {
-  const { currentUser, hasPermission } = useAuth();
+  const { currentUser, hasPermission, isAdmin } = useAuth();
   const { settings } = useSettings();
 
   const [medicines, setMedicines] = useState([]);
@@ -48,7 +48,13 @@ export const InventoryProvider = ({ children }) => {
 
       if (catsRes.status === 'fulfilled' && catsRes.value?.data) {
         const rawCats = Array.isArray(catsRes.value.data) ? catsRes.value.data : [];
-        const merged = Array.from(new Set([...rawCats, ...DEFAULT_THERAPEUTIC_CATEGORIES])).filter(Boolean);
+        const merged = Array.from(new Set([...rawCats, ...DEFAULT_THERAPEUTIC_CATEGORIES]))
+          .filter(Boolean)
+          .sort((a, b) => {
+            if (a === 'Other') return 1;
+            if (b === 'Other') return -1;
+            return a.localeCompare(b, undefined, { sensitivity: 'base' });
+          });
         setCategories(merged);
       }
 
@@ -204,7 +210,9 @@ export const InventoryProvider = ({ children }) => {
 
       const sellingPrice = primaryBatch ? Number(primaryBatch.sellingPrice) || 0 : Number(med.sellingPrice) || 0;
       const purchasePrice = primaryBatch ? Number(primaryBatch.purchasePrice) || 0 : Number(med.purchasePrice) || 0;
-      const location = primaryBatch ? primaryBatch.location || 'Shelf' : 'Shelf';
+      const rack = primaryBatch?.rack || med.rack || (primaryBatch?.location ? primaryBatch.location.split(',')[0]?.trim() : '') || 'Rack A-1';
+      const shelf = primaryBatch?.shelf || med.shelf || (primaryBatch?.location ? primaryBatch.location.split(',')[1]?.trim() : '') || 'Shelf 1';
+      const location = primaryBatch ? primaryBatch.location || `${rack}, ${shelf}` : (med.location || `${rack}, ${shelf}`);
       const batchNo = primaryBatch ? primaryBatch.batchNumber : 'N/A';
       const expiryDate = primaryBatch ? primaryBatch.expiryDate : null;
 
@@ -217,6 +225,8 @@ export const InventoryProvider = ({ children }) => {
         sellingPrice,
         purchasePrice,
         location,
+        rack,
+        shelf,
         batchNo,
         batchNumber: batchNo,
         expiryDate,
@@ -338,8 +348,8 @@ export const InventoryProvider = ({ children }) => {
 
   const deleteMedicine = useCallback(
     async (medicineId) => {
-      if (!hasPermission('medicines', 'delete')) {
-        throw new Error('Access Denied: You do not have permission to delete medicines.');
+      if (!isAdmin) {
+        throw new Error('Access Denied: Only administrators are authorized to delete medicines from the catalog.');
       }
 
       const target = medicines.find(
@@ -358,7 +368,7 @@ export const InventoryProvider = ({ children }) => {
         setBatches((prev) => prev.filter((b) => b.medicineId !== medicineId));
       }
     },
-    [hasPermission, medicines, fetchInventoryData]
+    [isAdmin, medicines, fetchInventoryData]
   );
 
   // Actions: Batch CRUD Operations via API
@@ -437,8 +447,8 @@ export const InventoryProvider = ({ children }) => {
 
   const deleteBatch = useCallback(
     async (batchId, reason = 'Batch removed / discarded') => {
-      if (!hasPermission('inventory', 'delete')) {
-        throw new Error('Access Denied: You do not have permission to delete batches.');
+      if (!isAdmin) {
+        throw new Error('Access Denied: Only administrators are authorized to delete stock batches.');
       }
 
       const target = batches.find(
@@ -454,7 +464,7 @@ export const InventoryProvider = ({ children }) => {
         throw err;
       }
     },
-    [hasPermission, batches, fetchInventoryData]
+    [isAdmin, batches, fetchInventoryData]
   );
 
   // Exact Batch Stock Adjustment

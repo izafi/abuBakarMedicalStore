@@ -30,6 +30,8 @@ const POPULAR_MEDICINE_TYPES = [
   'Syrup',
   'Injection',
   'Ointment',
+  'Cream',
+  'Gel',
   'Drops',
   'Inhaler',
   'Other',
@@ -42,6 +44,16 @@ const getInitialFormData = (initialData, categories) => {
     'Antibiotics';
 
   if (initialData) {
+    const locParts = (initialData.location || '').split(',');
+    const resolvedRack =
+      initialData.rack ||
+      (locParts[0] ? locParts[0].trim() : '') ||
+      'Rack A-1';
+    const resolvedShelf =
+      initialData.shelf ||
+      (locParts[1] ? locParts[1].trim() : '') ||
+      'Shelf 1';
+
     return {
       medicineId: initialData.medicineId || '',
       name: initialData.name || '',
@@ -60,9 +72,9 @@ const getInitialFormData = (initialData, categories) => {
       sellingPrice: '',
       manufacturingDate: '',
       expiryDate: '',
-      rack: '',
-      shelf: '',
-      location: '',
+      rack: resolvedRack,
+      shelf: resolvedShelf,
+      location: initialData.location || `${resolvedRack}, ${resolvedShelf}`,
     };
   }
 
@@ -106,12 +118,25 @@ export const MedicineForm = ({
     const list = Array.from(
       new Set([...(categories || []), ...DEFAULT_THERAPEUTIC_CATEGORIES])
     ).filter(Boolean);
-    return list.length > 0 ? list : DEFAULT_THERAPEUTIC_CATEGORIES;
+    const resolved = list.length > 0 ? list : DEFAULT_THERAPEUTIC_CATEGORIES;
+    return resolved.slice().sort((a, b) => {
+      if (a === 'Other') return 1;
+      if (b === 'Other') return -1;
+      return a.localeCompare(b, undefined, { sensitivity: 'base' });
+    });
   }, [categories]);
 
   const categoryOptions = useMemo(() => {
-    return combinedCategories.map((c) => ({ value: c, label: c }));
+    const opts = combinedCategories.map((c) => ({ value: c, label: c }));
+    opts.push({
+      value: '__ADD_NEW__',
+      label: '+ Custom Category...',
+      isAction: true,
+    });
+    return opts;
   }, [combinedCategories]);
+
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
 
   const [formData, setFormData] = useState(() =>
     getInitialFormData(initialData, categories)
@@ -208,6 +233,9 @@ export const MedicineForm = ({
         usage: formData.usage.trim() || 'General pharmaceutical treatment',
         manufacturer: formData.manufacturer.trim(),
         minStockAlert: Number(formData.minStockAlert) || 20,
+        rack: (formData.rack || 'Rack A-1').trim(),
+        shelf: (formData.shelf || 'Shelf 1').trim(),
+        location: `${(formData.rack || 'Rack A-1').trim()}, ${(formData.shelf || 'Shelf 1').trim()}`,
       },
       initialBatch: !isEditing
         ? {
@@ -478,25 +506,83 @@ export const MedicineForm = ({
               )}
             </div>
 
-            {/* Category (Responsive FilterDropdown) */}
+            {/* Category (Responsive FilterDropdown & Custom Entry) */}
             <div>
-              <label className="block text-xs font-bold text-black mb-1">
-                Therapeutic Category <span className="text-rose-600">*</span>
-              </label>
-              <FilterDropdown
-                value={formData.category}
-                onChange={(val) => {
-                  setFormData((prev) => ({ ...prev, category: val }));
-                  if (errors.category) {
-                    setErrors((prev) => ({ ...prev, category: null }));
-                  }
-                }}
-                options={categoryOptions}
-                placeholder="Select Category"
-                align="right"
-                buttonClassName="h-8 px-2.5 text-xs font-bold bg-white border-slate-300 rounded-lg text-black"
-                className="w-full"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-black">
+                  Therapeutic Category <span className="text-rose-600">*</span>
+                </label>
+                {isCustomCategory && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomCategory(false);
+                      if (!formData.category || !formData.category.trim()) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          category: combinedCategories[0] || 'Antibiotics',
+                        }));
+                      }
+                    }}
+                    className="text-[10px] font-bold text-emerald-700 hover:underline cursor-pointer"
+                  >
+                    Select from list
+                  </button>
+                )}
+              </div>
+              {isCustomCategory ? (
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    name="category"
+                    value={formData.category}
+                    onChange={handleChange}
+                    placeholder="e.g. Anti-inflammatory"
+                    className={`w-full h-8 px-2.5 text-xs font-bold bg-white border rounded-lg text-black focus:outline-none focus:ring-1 transition-all ${
+                      errors.category
+                        ? 'border-rose-400 focus:border-rose-500 bg-rose-50/20'
+                        : 'border-slate-300 focus:border-emerald-600 focus:ring-emerald-600/30'
+                    }`}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCustomCategory(false);
+                      if (!formData.category || !formData.category.trim()) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          category: combinedCategories[0] || 'Antibiotics',
+                        }));
+                      }
+                    }}
+                    className="px-2.5 h-8 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg shrink-0 cursor-pointer"
+                    title="Back to dropdown"
+                  >
+                    List
+                  </button>
+                </div>
+              ) : (
+                <FilterDropdown
+                  value={formData.category}
+                  onChange={(val) => {
+                    if (val === '__ADD_NEW__') {
+                      setIsCustomCategory(true);
+                      setFormData((prev) => ({ ...prev, category: '' }));
+                    } else {
+                      setFormData((prev) => ({ ...prev, category: val }));
+                    }
+                    if (errors.category) {
+                      setErrors((prev) => ({ ...prev, category: null }));
+                    }
+                  }}
+                  options={categoryOptions}
+                  placeholder="Select Category"
+                  align="right"
+                  buttonClassName="h-8 px-2.5 text-xs font-bold bg-white border-slate-300 rounded-lg text-black"
+                  className="w-full"
+                />
+              )}
               {errors.category && (
                 <p className="text-[11px] text-rose-600 font-semibold mt-1 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3 shrink-0" /> {errors.category}
@@ -577,6 +663,45 @@ export const MedicineForm = ({
               />
             </div>
           </div>
+
+          {/* Storage Rack & Shelf in Edit Mode */}
+          {isEditing && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-200/80">
+              {/* Storage Rack */}
+              <div>
+                <label className="flex items-center gap-1 text-xs font-bold text-black mb-1">
+                  <MapPin className="w-3 h-3 text-emerald-600" />
+                  <span>Storage Rack</span>
+                  <span className="text-[10px] text-slate-500 font-normal">(e.g. Rack A-1, 4)</span>
+                </label>
+                <input
+                  type="text"
+                  name="rack"
+                  value={formData.rack}
+                  onChange={handleChange}
+                  placeholder="e.g. Rack A-1, 4"
+                  className="w-full h-8 px-2.5 text-xs font-bold bg-white border border-slate-300 hover:border-emerald-400 focus:border-[#1C9A58] focus:ring-1 focus:ring-[#1C9A58]/30 rounded-lg text-black transition-all"
+                />
+              </div>
+
+              {/* Storage Shelf / Bin */}
+              <div>
+                <label className="flex items-center gap-1 text-xs font-bold text-black mb-1">
+                  <MapPin className="w-3 h-3 text-emerald-600" />
+                  <span>Storage Shelf / Bin</span>
+                  <span className="text-[10px] text-slate-500 font-normal">(e.g. Shelf 1, 2)</span>
+                </label>
+                <input
+                  type="text"
+                  name="shelf"
+                  value={formData.shelf}
+                  onChange={handleChange}
+                  placeholder="e.g. Shelf 1, 2"
+                  className="w-full h-8 px-2.5 text-xs font-bold bg-white border border-slate-300 hover:border-emerald-400 focus:border-[#1C9A58] focus:ring-1 focus:ring-[#1C9A58]/30 rounded-lg text-black transition-all"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ========================================================

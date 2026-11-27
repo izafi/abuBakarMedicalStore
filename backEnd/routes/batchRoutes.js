@@ -10,7 +10,7 @@ const {
   deleteBatch,
 } = require('../controller/batchController');
 const { authenticate, optionalAuth } = require('../middleware/authMiddleware');
-const { checkPermission } = require('../middleware/permissionMiddleware');
+const { checkPermission, requireAdmin } = require('../middleware/permissionMiddleware');
 const {
   validateCreateBatch,
   validateUpdateBatch,
@@ -47,7 +47,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  checkPermission('inventory', 'delete'),
+  requireAdmin,
   deleteBatch
 );
 

@@ -36,7 +36,7 @@ export const Inventory = () => {
     adjustBatchStock,
     inventoryMetrics,
   } = useInventory();
-  const { hasPermission } = useAuth();
+  const { hasPermission, isAdmin } = useAuth();
   const toast = useToast();
 
   const canAdd = hasPermission('inventory', 'add');
@@ -166,6 +166,10 @@ export const Inventory = () => {
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
+    if (!isAdmin) {
+      toast.showError('Access Denied: Only administrators are authorized to discard batches from stock.');
+      return;
+    }
     try {
       await deleteBatch(deleteTarget.batchId || deleteTarget.id, 'Batch permanently discarded');
       toast.showSuccess(`Batch ${deleteTarget.batchNumber} removed from inventory.`);
