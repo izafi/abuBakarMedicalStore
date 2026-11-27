@@ -127,7 +127,7 @@ const startServer = async () => {
     // Seed initial demo records if database is empty
     await seedInitialData();
 
-    const server = app.listen(PORT, () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
       console.log('====================================================');
       console.log(`  Abu Bakar Medical Store - Backend Server Started  `);
       console.log(`  Environment: ${process.env.NODE_ENV || 'development'}`);
