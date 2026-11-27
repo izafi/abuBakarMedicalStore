@@ -92,11 +92,11 @@ if (fs.existsSync(adminDistPath)) {
 
 if (staticPath) {
   app.use(express.static(staticPath));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      return next();
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      return res.sendFile(path.join(staticPath, 'index.html'));
     }
-    res.sendFile(path.join(staticPath, 'index.html'));
+    next();
   });
 } else {
   // Root Welcome Route for pure API mode
